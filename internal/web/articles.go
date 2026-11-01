@@ -2,6 +2,7 @@ package web
 
 import (
 	"github.com/BigCapybara638/KnowledgeBase/internal/categories"
+	"github.com/BigCapybara638/KnowledgeBase/internal/content"
 	"github.com/BigCapybara638/KnowledgeBase/internal/domain"
 	"github.com/go-chi/chi/v5"
 	"net/http"
@@ -48,7 +49,12 @@ func (a *App) article(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, r, e)
 		return
 	}
-	a.view(w, r, 200, "article.html", map[string]any{"Title": item.Title, "Article": item, "Categories": cats, "SelectedCategory": string(item.CategoryID)})
+	rendered, e := content.ValidateAndRender(item.Document)
+	if e != nil {
+		a.fail(w, r, e)
+		return
+	}
+	a.view(w, r, 200, "article.html", map[string]any{"Title": item.Title, "Article": item, "Rendered": rendered.HTML, "Categories": cats, "SelectedCategory": string(item.CategoryID)})
 }
 func (a *App) categoryMenu(w http.ResponseWriter, r *http.Request) {
 	id := domain.ID(chi.URLParam(r, "id"))
