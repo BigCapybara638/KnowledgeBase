@@ -1,0 +1,10 @@
+.superpowers/
+node_modules/
+internal/ui/static/dist/
+bin/
+test-results/
+playwright-report/
+.env
+/data/
+/backups/
+*.log
