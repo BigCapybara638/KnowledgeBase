@@ -111,12 +111,16 @@ func validChild(parent, child string) bool {
 	switch parent {
 	case "":
 		return child == "doc"
-	case "doc", "blockquote", "listItem":
-		return child == "paragraph" || child == "heading" || child == "blockquote" || child == "bulletList" || child == "orderedList" || child == "codeBlock" || child == "horizontalRule"
+	case "doc", "blockquote", "listItem", "tableCell", "tableHeader":
+		return child == "image" || child == "table" || child == "paragraph" || child == "heading" || child == "blockquote" || child == "bulletList" || child == "orderedList" || child == "codeBlock" || child == "horizontalRule"
 	case "bulletList", "orderedList":
 		return child == "listItem"
 	case "paragraph", "heading":
 		return child == "text" || child == "hardBreak"
+	case "table":
+		return child == "tableRow"
+	case "tableRow":
+		return child == "tableCell" || child == "tableHeader"
 	case "codeBlock":
 		return child == "text"
 	}
@@ -171,9 +175,67 @@ func (r *renderer) render(n node, parent string, depth int) error {
 		r.plain.WriteString(n.Text)
 		return nil
 	}
+	if n.Type == "image" {
+		if !attrsOnly(n.Attrs, "src", "alt", "title", "width", "height") || len(n.Content) != 0 {
+			return domain.ErrInvalid
+		}
+		src, e := str(n.Attrs, "src")
+		if e != nil || !strings.HasPrefix(src, "/media/") {
+			return domain.ErrInvalid
+		}
+		id := strings.TrimPrefix(src, "/media/")
+		if _, e = uuid.Parse(id); e != nil {
+			return domain.ErrInvalid
+		}
+		alt, e := str(n.Attrs, "alt")
+		if e != nil {
+			return e
+		}
+		title, e := str(n.Attrs, "title")
+		if e != nil {
+			return e
+		}
+		for _, key := range []string{"width", "height"} {
+			if _, e = number(n.Attrs, key, 0, 1, 25000000); e != nil {
+				return e
+			}
+		}
+		r.html.WriteString(`<img src="` + html.EscapeString(src) + `" alt="` + html.EscapeString(alt) + `" title="` + html.EscapeString(title) + `" loading="lazy">`)
+		r.plain.WriteString(" " + alt + " ")
+		r.media = append(r.media, domain.ID(id))
+		return nil
+	}
 	tag, extra := "", ""
 	switch n.Type {
 	case "doc":
+	case "table":
+		tag = "table"
+	case "tableRow":
+		tag = "tr"
+	case "tableCell", "tableHeader":
+		if !attrsOnly(n.Attrs, "colspan", "rowspan", "colwidth", "align") {
+			return domain.ErrInvalid
+		}
+		col, e := number(n.Attrs, "colspan", 1, 1, 100)
+		if e != nil {
+			return e
+		}
+		row, e := number(n.Attrs, "rowspan", 1, 1, 100)
+		if e != nil {
+			return e
+		}
+		align, e := str(n.Attrs, "align")
+		if e != nil || (align != "" && align != "left" && align != "right" && align != "center") {
+			return domain.ErrInvalid
+		}
+		tag = "td"
+		if n.Type == "tableHeader" {
+			tag = "th"
+		}
+		extra = ` colspan="` + strconv.Itoa(col) + `" rowspan="` + strconv.Itoa(row) + `"`
+		if align != "" {
+			extra += ` align="` + align + `"`
+		}
 	case "paragraph":
 		tag = "p"
 	case "heading":
@@ -223,7 +285,7 @@ func (r *renderer) render(n node, parent string, depth int) error {
 	default:
 		return domain.ErrInvalid
 	}
-	if n.Type != "heading" && n.Type != "orderedList" && n.Type != "codeBlock" && len(n.Attrs) != 0 {
+	if n.Type != "heading" && n.Type != "orderedList" && n.Type != "codeBlock" && n.Type != "tableCell" && n.Type != "tableHeader" && len(n.Attrs) != 0 {
 		return domain.ErrInvalid
 	}
 	if parent == "codeBlock" && len(n.Marks) > 0 {

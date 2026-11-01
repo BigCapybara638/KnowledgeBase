@@ -128,12 +128,12 @@ docs/operations.md                  установка, обновление, ba
 
 **Interfaces:** Consumes auth, drafts и content. Produces `media.Service.Upload(ctx, actorID, draftID domain.ID, source io.Reader, filename string) (domain.Media, error)`, `Open(ctx, actorID, mediaID domain.ID) (media.File, error)`, `CollectOrphans(ctx, olderThan time.Time) (int, error)`. `domain.Media` — ID/type/size/width/height; `media.File` — read-closer и проверенные метаданные. Расширяет валидатор image/table nodes; publish проверяет и атомарно сохраняет ссылки на media.
 
-- [ ] **Step 1:** Написать `TestPrivateDraftMediaDeniedToOtherUser`, `TestPublishedMediaRequiresLogin`, `TestCannotPublishSomeoneElsesPrivateImage`, `TestMimeSpoofAndTraversalRejected`, `TestSizeAndPixelLimits`, `TestThirdParallelUploadRejected`, `TestFailedUploadLeavesNoPublishedReference`, `TestGCRespectsDraftAndArticleReferences`.
-- [ ] **Step 2:** Запустить `go test ./internal/media ./internal/content ./internal/articles -v`, убедиться в провале новых ожиданий.
-- [ ] **Step 3:** Реализовать файловый staging и безопасные сгенерированные имена, ограничения загрузки, доступ по привязкам и координируемую блокировкой очистку. Не принимать file path/src/владельца из запроса как доверенные данные; физический файл становится доступен только через авторизованный обработчик.
-- [ ] **Step 4:** Подключить Tiptap image/table, вставку/перетаскивание и изменение структуры таблицы. Расширить server renderer для таблиц и изображений; произвольный HTML, стили и внешние image URL остаются запрещены. Тестировать сохранение/повторное открытие, не только факт наличия toolbar.
-- [ ] **Step 5:** Выполнить `go test -race ./internal/media ./internal/content ./internal/articles` и `npm run test:e2e -- editor.spec.ts`. Ожидаются опубликованные изображение/таблица после reopen и недоступность личного медиа второму пользователю. Playwright использует одноразовый test-server и временный data-dir без демонстрационных пользователей в обычном запуске.
-- [ ] **Step 6:** Commit `feat: add protected article images and editable tables`.
+- [x] **Step 1:** Написать `TestPrivateDraftMediaDeniedToOtherUser`, `TestPublishedMediaRequiresLogin`, `TestCannotPublishSomeoneElsesPrivateImage`, `TestMimeSpoofAndTraversalRejected`, `TestSizeAndPixelLimits`, `TestThirdParallelUploadRejected`, `TestFailedUploadLeavesNoPublishedReference`, `TestGCRespectsDraftAndArticleReferences`.
+- [x] **Step 2:** Запустить `go test ./internal/media ./internal/content ./internal/articles -v`, убедиться в провале новых ожиданий.
+- [x] **Step 3:** Реализовать файловый staging и безопасные сгенерированные имена, ограничения загрузки, доступ по привязкам и координируемую блокировкой очистку. Не принимать file path/src/владельца из запроса как доверенные данные; физический файл становится доступен только через авторизованный обработчик.
+- [x] **Step 4:** Подключить Tiptap image/table, вставку/перетаскивание и изменение структуры таблицы. Расширить server renderer для таблиц и изображений; произвольный HTML, стили и внешние image URL остаются запрещены. Тестировать сохранение/повторное открытие, не только факт наличия toolbar.
+- [x] **Step 5:** Выполнить `go test -race ./internal/media ./internal/content ./internal/articles` и `npm run test:e2e -- editor.spec.ts`. Ожидаются опубликованные изображение/таблица после reopen и недоступность личного медиа второму пользователю. Playwright использует одноразовый test-server и временный data-dir без демонстрационных пользователей в обычном запуске.
+- [x] **Step 6:** Commit `feat: add protected article images and editable tables`.
 
 ### Task 6: Поиск по опубликованному содержимому
 

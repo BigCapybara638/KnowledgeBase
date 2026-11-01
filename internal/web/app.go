@@ -16,6 +16,7 @@ import (
 	"github.com/BigCapybara638/KnowledgeBase/internal/categories"
 	"github.com/BigCapybara638/KnowledgeBase/internal/config"
 	"github.com/BigCapybara638/KnowledgeBase/internal/domain"
+	"github.com/BigCapybara638/KnowledgeBase/internal/media"
 	"github.com/BigCapybara638/KnowledgeBase/internal/storage"
 	"github.com/BigCapybara638/KnowledgeBase/internal/ui"
 	"github.com/go-chi/chi/v5"
@@ -24,6 +25,7 @@ import (
 
 type userKey struct{}
 type App struct {
+	media      *media.Service
 	articles   *articles.Service
 	categories *categories.Service
 	cfg        config.Config
@@ -40,6 +42,7 @@ func New(cfg config.Config, s *storage.Store, accounts *auth.Service) (*App, err
 		return nil, e
 	}
 	a := &App{cfg: cfg, store: s, accounts: accounts, views: views, router: chi.NewRouter()}
+	a.media = media.New(s)
 	a.articles = articles.New(s)
 	a.categories = categories.New(s)
 	r := a.router
@@ -61,6 +64,8 @@ func New(cfg config.Config, s *storage.Store, accounts *auth.Service) (*App, err
 		p.Post("/articles/{id}/drafts", a.createDraft)
 		p.Get("/drafts/{id}/edit", a.editor)
 		p.Put("/drafts/{id}", a.saveDraft)
+		p.Post("/drafts/{id}/media", a.uploadImage)
+		p.Get("/media/{id}", a.getImage)
 		p.Post("/drafts/{id}/publish", a.publishDraft)
 		p.Post("/articles/{id}/archive", a.archiveArticle)
 		p.Get("/admin/archive", a.archivePage)
