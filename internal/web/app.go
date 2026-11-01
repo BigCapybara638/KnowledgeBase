@@ -11,7 +11,9 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/BigCapybara638/KnowledgeBase/internal/articles"
 	"github.com/BigCapybara638/KnowledgeBase/internal/auth"
+	"github.com/BigCapybara638/KnowledgeBase/internal/categories"
 	"github.com/BigCapybara638/KnowledgeBase/internal/config"
 	"github.com/BigCapybara638/KnowledgeBase/internal/domain"
 	"github.com/BigCapybara638/KnowledgeBase/internal/storage"
@@ -22,12 +24,14 @@ import (
 
 type userKey struct{}
 type App struct {
-	cfg      config.Config
-	store    *storage.Store
-	accounts *auth.Service
-	router   chi.Router
-	handler  http.Handler
-	views    *template.Template
+	articles   *articles.Service
+	categories *categories.Service
+	cfg        config.Config
+	store      *storage.Store
+	accounts   *auth.Service
+	router     chi.Router
+	handler    http.Handler
+	views      *template.Template
 }
 
 func New(cfg config.Config, s *storage.Store, accounts *auth.Service) (*App, error) {
@@ -36,6 +40,8 @@ func New(cfg config.Config, s *storage.Store, accounts *auth.Service) (*App, err
 		return nil, e
 	}
 	a := &App{cfg: cfg, store: s, accounts: accounts, views: views, router: chi.NewRouter()}
+	a.articles = articles.New(s)
+	a.categories = categories.New(s)
 	r := a.router
 	r.Get("/login", a.loginPage)
 	r.Post("/login", a.login)
@@ -48,7 +54,13 @@ func New(cfg config.Config, s *storage.Store, accounts *auth.Service) (*App, err
 	})
 	r.Group(func(p chi.Router) {
 		p.Use(a.requireContent)
-		p.Get("/", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("База знаний")) })
+		p.Get("/", a.home)
+		p.Get("/articles/{id}", a.article)
+		p.Get("/categories/{id}/articles", a.categoryMenu)
+		p.Get("/admin/categories", a.categoriesPage)
+		p.Post("/admin/categories", a.saveCategory)
+		p.Post("/admin/categories/{id}", a.saveCategory)
+		p.Post("/admin/categories/{id}/delete", a.deleteCategory)
 		p.Get("/admin/users", a.usersPage)
 		p.Post("/admin/users", a.createUser)
 		p.Post("/admin/users/{id}/reset-password", a.resetPassword)

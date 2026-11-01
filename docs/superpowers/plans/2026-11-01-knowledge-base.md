@@ -102,12 +102,12 @@ docs/operations.md                  установка, обновление, ba
 
 **Interfaces:** Consumes auth и storage. Produces `categories.Service.List(ctx) ([]domain.Category, error)`, `Save(ctx, adminID domain.ID, in categories.Update) (domain.Category, error)`, `Delete(ctx, adminID, categoryID domain.ID, expected domain.Version) error`; `articles.Service.Get(ctx, actorID, articleID domain.ID) (domain.Article, error)`, `List(ctx, actorID domain.ID, categoryID *domain.ID, page int) (articles.Page, error)`, `ListCategoryMenu(ctx, actorID, categoryID domain.ID, cursor string) (articles.MenuPage, error)`. Category/Article содержат ID, title, version; Article также автора, редактора, document/plainText, категорию и даты. `Update` содержит ID/title/order/expectedVersion.
 
-- [ ] **Step 1:** Написать `TestRenameKeepsArticleURL`, `TestCardsExcludeUnpublishedAndArchived`, `TestCategoryFilterAndStablePagination`, `TestSidebarPagesBy50`, `TestDeletingNonemptyCategoryFails`, `TestOnlyAdminManagesCategories`. Чтение проверять на fixture опубликованной статьи в настоящей временной SQLite.
-- [ ] **Step 2:** Запустить `go test ./internal/articles ./internal/categories ./internal/web -v`, увидеть провал новых сценариев.
-- [ ] **Step 3:** Реализовать GET `/`, `/articles/{uuid}`, меню и фильтр; категории — через административные формы с проверкой версии. По 20 карточек, безопасные фрагменты, UUID не меняется от title. Разделить полную страницу и HTMX-фрагменты, чтобы прямой переход возвращал полноценный документ.
-- [ ] **Step 4:** Настроить Vite/Tailwind/HTMX, локальную поставку без CDN, меню слева и карточки на главной. Работу с клавиатурой, подписи форм и узкий экран включить в шаблоны. Результат сборки встроить через `go:embed`; `make build` сначала собирает frontend.
-- [ ] **Step 5:** Выполнить `npm ci && npm run build && go test ./internal/articles ./internal/categories ./internal/web && make build`. Ожидаются работающая карточка/статья по прямой ссылке, недоступность гостю и собранный сервер без Node.js в runtime.
-- [ ] **Step 6:** Commit `feat: add categories and article browsing interface`.
+- [x] **Step 1:** Написать `TestRenameKeepsArticleURL`, `TestCardsExcludeUnpublishedAndArchived`, `TestCategoryFilterAndStablePagination`, `TestSidebarPagesBy50`, `TestDeletingNonemptyCategoryFails`, `TestOnlyAdminManagesCategories`. Чтение проверять на fixture опубликованной статьи в настоящей временной SQLite.
+- [x] **Step 2:** Запустить `go test ./internal/articles ./internal/categories ./internal/web -v`, увидеть провал новых сценариев.
+- [x] **Step 3:** Реализовать GET `/`, `/articles/{uuid}`, меню и фильтр; категории — через административные формы с проверкой версии. По 20 карточек, безопасные фрагменты, UUID не меняется от title. Разделить полную страницу и HTMX-фрагменты, чтобы прямой переход возвращал полноценный документ.
+- [x] **Step 4:** Настроить Vite/Tailwind/HTMX, локальную поставку без CDN, меню слева и карточки на главной. Работу с клавиатурой, подписи форм и узкий экран включить в шаблоны. Результат сборки встроить через `go:embed`; `make build` сначала собирает frontend.
+- [x] **Step 5:** Выполнить `npm ci && npm run build && go test ./internal/articles ./internal/categories ./internal/web && make build`. Ожидаются работающая карточка/статья по прямой ссылке, недоступность гостю и собранный сервер без Node.js в runtime.
+- [x] **Step 6:** Commit `feat: add categories and article browsing interface`.
 
 ### Task 4: Личные черновики, визуальный текст и конкурентная публикация
 

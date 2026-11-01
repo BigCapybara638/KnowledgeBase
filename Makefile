@@ -8,6 +8,7 @@ test:
 	go test -race ./...
 
 build:
+	npm run build
 	mkdir -p bin
 	CGO_ENABLED=0 go build -trimpath -o bin/kb ./cmd/kb
 

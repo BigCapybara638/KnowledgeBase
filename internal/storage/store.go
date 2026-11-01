@@ -176,3 +176,14 @@ func AcquireFileLock(dir, name string, exclusive, nonblocking bool) (io.Closer, 
 	}
 	return f, nil
 }
+
+// AssertActor runs inside a write transaction so revocation cannot race a write.
+func AssertActor(ctx context.Context, tx *sql.Tx, id domain.ID, admin bool) error {
+	var role string
+	var disabled, mustChange bool
+	e := tx.QueryRowContext(ctx, "SELECT role,disabled,must_change FROM users WHERE id=?", id).Scan(&role, &disabled, &mustChange)
+	if errors.Is(e, sql.ErrNoRows) || disabled || mustChange || (admin && role != "admin") {
+		return domain.ErrForbidden
+	}
+	return e
+}
