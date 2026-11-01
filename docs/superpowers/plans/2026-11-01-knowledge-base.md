@@ -141,11 +141,11 @@ docs/operations.md                  установка, обновление, ba
 
 **Interfaces:** Consumes опубликованные `articles` и производный `PlainText` от content. Produces `search.Service.Find(ctx, actorID domain.ID, query string, page int) (search.Page, error)`; `Page` содержит items с articleID/title/snippet/category/author и параметры пагинации. Обновление индекса не является отдельной eventual-consistency задачей: оно входит в транзакцию публикации/архивирования.
 
-- [ ] **Step 1:** Написать `TestFindsCyrillicAndTableText`, `TestTitleRanksAboveBody`, `TestSearchNeverShowsDrafts`, `TestArchiveAndRepublishUpdateIndex`, `TestQuotesPunctuationAndEmptyQuery`, `TestSnippetDoesNotExecuteHTML`, `TestPublishRollbackKeepsIndexConsistent`.
-- [ ] **Step 2:** Выполнить `go test ./internal/search ./internal/articles -v`, проверить содержательные провалы новых тестов.
-- [ ] **Step 3:** Реализовать `unicode61`, параметризованный запрос с безопасным преобразованием текстового ввода в FTS и ранжирование заголовка выше тела. Пустой запрос направить к обычному списку статей. Реализовать GET `/search`, HTMX-выдачу и полную страницу по прямому URL.
-- [ ] **Step 4:** Выполнить `go test -race ./internal/search ./internal/articles ./internal/web`, а затем браузерный сценарий публикация → поиск → архивирование → отсутствие в выдаче.
-- [ ] **Step 5:** Commit `feat: add transactional full-text article search`.
+- [x] **Step 1:** Написать `TestFindsCyrillicAndTableText`, `TestTitleRanksAboveBody`, `TestSearchNeverShowsDrafts`, `TestArchiveAndRepublishUpdateIndex`, `TestQuotesPunctuationAndEmptyQuery`, `TestSnippetDoesNotExecuteHTML`, `TestPublishRollbackKeepsIndexConsistent`.
+- [x] **Step 2:** Выполнить `go test ./internal/search ./internal/articles -v`, проверить содержательные провалы новых тестов.
+- [x] **Step 3:** Реализовать `unicode61`, параметризованный запрос с безопасным преобразованием текстового ввода в FTS и ранжирование заголовка выше тела. Пустой запрос направить к обычному списку статей. Реализовать GET `/search`, HTMX-выдачу и полную страницу по прямому URL.
+- [x] **Step 4:** Выполнить `go test -race ./internal/search ./internal/articles ./internal/web`, а затем браузерный сценарий публикация → поиск → архивирование → отсутствие в выдаче.
+- [x] **Step 5:** Commit `feat: add transactional full-text article search`.
 
 ### Task 7: Согласованные копии, восстановление и обслуживание
 

@@ -17,6 +17,7 @@ import (
 	"github.com/BigCapybara638/KnowledgeBase/internal/config"
 	"github.com/BigCapybara638/KnowledgeBase/internal/domain"
 	"github.com/BigCapybara638/KnowledgeBase/internal/media"
+	"github.com/BigCapybara638/KnowledgeBase/internal/search"
 	"github.com/BigCapybara638/KnowledgeBase/internal/storage"
 	"github.com/BigCapybara638/KnowledgeBase/internal/ui"
 	"github.com/go-chi/chi/v5"
@@ -25,6 +26,7 @@ import (
 
 type userKey struct{}
 type App struct {
+	search     *search.Service
 	media      *media.Service
 	articles   *articles.Service
 	categories *categories.Service
@@ -42,6 +44,7 @@ func New(cfg config.Config, s *storage.Store, accounts *auth.Service) (*App, err
 		return nil, e
 	}
 	a := &App{cfg: cfg, store: s, accounts: accounts, views: views, router: chi.NewRouter()}
+	a.search = search.New(s)
 	a.media = media.New(s)
 	a.articles = articles.New(s)
 	a.categories = categories.New(s)
@@ -58,6 +61,7 @@ func New(cfg config.Config, s *storage.Store, accounts *auth.Service) (*App, err
 	r.Group(func(p chi.Router) {
 		p.Use(a.requireContent)
 		p.Get("/", a.home)
+		p.Get("/search", a.searchPage)
 		p.Get("/articles/{id}", a.article)
 		p.Get("/drafts", a.draftsPage)
 		p.Post("/drafts", a.createDraft)

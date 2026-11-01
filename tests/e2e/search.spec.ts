@@ -1,0 +1,5 @@
+import {test,expect} from '@playwright/test'
+import {login,createArticle} from './helpers'
+test('Russian full-text search is safe and removes archived articles',async({page})=>{
+ await login(page);const url=await createArticle(page,'Порядок поездок','<script>window.searchInjected=1</script> Командировка согласуется заранее');await page.getByRole('textbox',{name:'Поиск по базе знаний',exact:true}).fill('командировка');await page.getByRole('button',{name:'Найти',exact:true}).click();await expect(page.locator('.search-result')).toHaveCount(1);await expect(page.locator('.search-result')).toContainText('Порядок поездок');expect(await page.evaluate(()=>(window as any).searchInjected)).toBeUndefined();await page.goto(url);await page.getByRole('button',{name:'Архивировать статью',exact:true}).click();await expect(page.getByRole('heading',{name:'Архив статей'})).toBeVisible();await page.getByRole('textbox',{name:'Поиск по базе знаний',exact:true}).fill('командировка');await page.getByRole('button',{name:'Найти',exact:true}).click();await expect(page.getByRole('heading',{name:'Ничего не найдено',exact:true})).toBeVisible()
+})
