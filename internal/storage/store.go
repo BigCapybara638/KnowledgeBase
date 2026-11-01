@@ -25,8 +25,9 @@ import (
 var migrations embed.FS
 
 type Store struct {
-	Read, Write *sql.DB
-	DataDir     string
+	restoreLease io.Closer
+	Read, Write  *sql.DB
+	DataDir      string
 }
 
 func Open(ctx context.Context, dataDir string) (*Store, error) {
@@ -36,6 +37,19 @@ func Open(ctx context.Context, dataDir string) (*Store, error) {
 	}
 	if err = os.MkdirAll(abs, 0700); err != nil {
 		return nil, err
+	}
+	lease, err := AcquireFileLock(abs, "restore.lock", false, true)
+	if err != nil {
+		return nil, err
+	}
+	leaseOwned := true
+	defer func() {
+		if leaseOwned {
+			lease.Close()
+		}
+	}()
+	if _, e := os.Stat(filepath.Join(abs, "restore-in-progress")); e == nil {
+		return nil, errors.New("incomplete restore: preserve the directory and restore into an empty one")
 	}
 	u := url.URL{Scheme: "file", Path: filepath.Join(abs, "knowledgebase.db")}
 	q := url.Values{}
@@ -51,7 +65,8 @@ func Open(ctx context.Context, dataDir string) (*Store, error) {
 	}
 	w.SetMaxOpenConns(1)
 	w.SetMaxIdleConns(1)
-	s := &Store{Write: w, DataDir: abs}
+	s := &Store{Write: w, DataDir: abs, restoreLease: lease}
+	leaseOwned = false
 	ok := false
 	defer func() {
 		if !ok {
@@ -95,6 +110,9 @@ func (s *Store) Close() error {
 	}
 	if s.Write != nil {
 		b = s.Write.Close()
+	}
+	if s.restoreLease != nil {
+		s.restoreLease.Close()
 	}
 	return errors.Join(a, b)
 }
@@ -186,4 +204,39 @@ func AssertActor(ctx context.Context, tx *sql.Tx, id domain.ID, admin bool) erro
 		return domain.ErrForbidden
 	}
 	return e
+}
+
+// OpenExisting never creates or migrates a database. Callers coordinate restore locks.
+func OpenExisting(ctx context.Context, dir string, readOnly bool) (*sql.DB, error) {
+	p, e := filepath.Abs(filepath.Join(dir, "knowledgebase.db"))
+	if e != nil {
+		return nil, e
+	}
+	info, e := os.Lstat(p)
+	if e != nil {
+		return nil, e
+	}
+	if !info.Mode().IsRegular() {
+		return nil, errors.New("database must be a regular file")
+	}
+	u := url.URL{Scheme: "file", Path: p}
+	q := url.Values{}
+	q.Set("mode", "rw")
+	if readOnly {
+		q.Set("mode", "ro")
+	}
+	q.Add("_pragma", "busy_timeout(5000)")
+	q.Add("_pragma", "foreign_keys(1)")
+	q.Add("_pragma", "cache_size(-4096)")
+	u.RawQuery = q.Encode()
+	db, e := driver.Open(u.String(), fts5.Register)
+	if e != nil {
+		return nil, e
+	}
+	db.SetMaxOpenConns(1)
+	if e = db.PingContext(ctx); e != nil {
+		db.Close()
+		return nil, e
+	}
+	return db, nil
 }

@@ -153,12 +153,12 @@ docs/operations.md                  установка, обновление, ba
 
 **Interfaces:** Consumes storage, immutable media и их блокировку. Produces `backup.Create(ctx, dataDir, backupDir string) (backup.Manifest, error)`, `backup.Restore(ctx, bundleDir, targetDataDir string) error`, `backup.Rotate(ctx, backupDir string, keep int) error`. `Manifest` содержит версию формата, время, список файлов и SHA-256. `restore` требует эксклюзивную блокировку экземпляра; `backup` и GC согласуют файловую блокировку, не останавливая публикацию.
 
-- [ ] **Step 1:** Написать `TestBackupIncludesCommittedWAL`, `TestBackupDuringPublishAndGCIsRestorable`, `TestRestoreRejectsRunningApp`, `TestRestoreRejectsNonemptyTarget`, `TestFailedCopyKeepsPreviousBackups`, `TestRotateKeeps14AfterSuccessfulCopy`, `TestRestoreRevokesSessions`, `TestChecksumMismatchRejectsBeforeReplacement`.
-- [ ] **Step 2:** Выполнить `go test ./internal/backup -v`, увидеть провал новых сценариев. Для ошибок записи использовать управляемый failing-writer, не заполнение всего диска машины.
-- [ ] **Step 3:** Реализовать снимок SQLite штатным механизмом, неизменяемые файлы, временный комплект и атомарную финализацию manifest. Блокировка исключает GC во время копии; публикация может продолжаться. Запрещено считать простой `cp` живого `.db` корректной копией. В restore проверить целостность, исключить обход пути из manifest и отозвать старые сессии.
-- [ ] **Step 4:** Реализовать CLI backup/restore/maintenance, проверку повторных запусков и ротацию только после успешного комплекта. В operations описать ежедневный вызов через host cron/systemd timer и перенос копий за пределы сервера как отдельную инфраструктурную обязанность.
-- [ ] **Step 5:** Выполнить `go test -race ./internal/backup ./internal/media`. На временных каталогах провести полный цикл: пользователь/черновик/статья/картинка → backup → restore в другую папку → проверка чтения и входа новой сессией. Старый токен должен быть недействителен.
-- [ ] **Step 6:** Commit `feat: add consistent backup and restore operations`.
+- [x] **Step 1:** Написать `TestBackupIncludesCommittedWAL`, `TestBackupDuringPublishAndGCIsRestorable`, `TestRestoreRejectsRunningApp`, `TestRestoreRejectsNonemptyTarget`, `TestFailedCopyKeepsPreviousBackups`, `TestRotateKeeps14AfterSuccessfulCopy`, `TestRestoreRevokesSessions`, `TestChecksumMismatchRejectsBeforeReplacement`.
+- [x] **Step 2:** Выполнить `go test ./internal/backup -v`, увидеть провал новых сценариев. Для ошибок записи использовать управляемый failing-writer, не заполнение всего диска машины.
+- [x] **Step 3:** Реализовать снимок SQLite штатным механизмом, неизменяемые файлы, временный комплект и атомарную финализацию manifest. Блокировка исключает GC во время копии; публикация может продолжаться. Запрещено считать простой `cp` живого `.db` корректной копией. В restore проверить целостность, исключить обход пути из manifest и отозвать старые сессии.
+- [x] **Step 4:** Реализовать CLI backup/restore/maintenance, проверку повторных запусков и ротацию только после успешного комплекта. В operations описать ежедневный вызов через host cron/systemd timer и перенос копий за пределы сервера как отдельную инфраструктурную обязанность.
+- [x] **Step 5:** Выполнить `go test -race ./internal/backup ./internal/media`. На временных каталогах провести полный цикл: пользователь/черновик/статья/картинка → backup → restore в другую папку → проверка чтения и входа новой сессией. Старый токен должен быть недействителен.
+- [x] **Step 6:** Commit `feat: add consistent backup and restore operations`.
 
 ### Task 8: Docker Compose и подключение существующего Nginx
 

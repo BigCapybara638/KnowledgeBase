@@ -32,7 +32,18 @@ func run(args []string) error {
 	}
 	if command == "check" {
 		c := &http.Client{Timeout: 2 * time.Second, Transport: &http.Transport{Proxy: nil}}
-		r, e := c.Get("http://127.0.0.1:8080/readyz")
+		addr := os.Getenv("KB_LISTEN_ADDR")
+		if addr == "" {
+			addr = ":8080"
+		}
+		host, port, e := net.SplitHostPort(addr)
+		if e != nil {
+			return e
+		}
+		if host == "" || host == "0.0.0.0" || host == "::" {
+			host = "127.0.0.1"
+		}
+		r, e := c.Get("http://" + net.JoinHostPort(host, port) + "/readyz")
 		if e != nil {
 			return e
 		}
@@ -41,6 +52,9 @@ func run(args []string) error {
 			return fmt.Errorf("not ready: %d", r.StatusCode)
 		}
 		return nil
+	}
+	if command == "backup" || command == "restore" || command == "maintenance" {
+		return operations(command, args[1:])
 	}
 	if command == "admin" {
 		return bootstrap(args[1:])
@@ -68,7 +82,7 @@ func run(args []string) error {
 	if e != nil {
 		return e
 	}
-	log.Printf("listening on %s", ln.Addr())
+	defer ln.Close()
 	accounts, e := auth.New(store, auth.Config{PublicURL: cfg.PublicURL, Dev: cfg.Dev})
 	if e != nil {
 		return e
@@ -77,6 +91,7 @@ func run(args []string) error {
 	if e != nil {
 		return e
 	}
+	log.Printf("listening on %s", ln.Addr())
 	return web.Serve(ctx, ln, handler)
 }
 
