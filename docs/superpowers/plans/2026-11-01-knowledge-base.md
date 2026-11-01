@@ -6,7 +6,7 @@
 
 **Architecture:** Один постоянно работающий Go-процесс отдаёт HTML/HTMX, статические ресурсы и защищённые изображения; SQLite находится на локальном томе. Существующий Nginx из другого Compose-проекта направляет запросы через отдельную внешнюю Docker-сеть. Автоматического выключения, активатора и второго Nginx нет.
 
-**Tech Stack:** Go, chi/v5, html/template, modernc.org/sqlite, sqlc, goose, FTS5; HTMX, Tailwind CSS, Tiptap; Docker Compose. Node.js нужен только при сборке.
+**Tech Stack:** Go, chi/v5, html/template, github.com/ncruces/go-sqlite3, sqlc, goose, FTS5; HTMX, Tailwind CSS, Tiptap; Docker Compose. Node.js нужен только при сборке.
 
 **Spec:** [2026-11-01-knowledge-base-design.md](../specs/2026-11-01-knowledge-base-design.md). Читать спецификацию и план вместе. Предлагаемые настройки из раздела 3 спецификации не выдавать за уже подтверждённые пользователем требования.
 
