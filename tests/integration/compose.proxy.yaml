@@ -1,0 +1,26 @@
+services:
+  nginx:
+    image: nginx:1.28-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236
+    ports:
+      - '127.0.0.1::443'
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ${KB_ROUTE_FILE}:/etc/nginx/knowledgebase-location.conf:ro
+      - ${KB_TLS_DIR}:/tls:ro
+    networks:
+      - default
+      - ingress
+    depends_on:
+      - client-software
+  client-software:
+    image: nginx:1.28-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236
+    volumes:
+      - ./client.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      default:
+        aliases:
+          - app
+networks:
+  ingress:
+    external: true
+    name: ${KB_NETWORK_NAME}

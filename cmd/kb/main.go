@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/BigCapybara638/KnowledgeBase/internal/auth"
@@ -29,6 +30,13 @@ func run(args []string) error {
 	command := "serve"
 	if len(args) > 0 {
 		command = args[0]
+	}
+	if command == "metrics" {
+		m, e := readMetrics("/sys/fs/cgroup")
+		if e != nil {
+			return e
+		}
+		return json.NewEncoder(os.Stdout).Encode(m)
 	}
 	if command == "check" {
 		c := &http.Client{Timeout: 2 * time.Second, Transport: &http.Transport{Proxy: nil}}

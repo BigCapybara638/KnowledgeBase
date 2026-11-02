@@ -1,0 +1,13 @@
+.git
+.superpowers
+node_modules
+bin
+test-results
+playwright-report
+internal/ui/static/dist
+.env
+data
+backups
+.validation
+**/__pycache__
+**/*.log

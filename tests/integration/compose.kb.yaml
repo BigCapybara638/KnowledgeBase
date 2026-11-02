@@ -1,0 +1,8 @@
+services:
+  knowledgebase-app:
+    volumes:
+      - kb-data:/data
+      - kb-backups:/backups
+volumes:
+  kb-data:
+  kb-backups:

@@ -8,3 +8,7 @@ playwright-report/
 /data/
 /backups/
 *.log
+
+__pycache__/
+*.pyc
+.validation/

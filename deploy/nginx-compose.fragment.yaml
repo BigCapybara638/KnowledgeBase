@@ -1,0 +1,11 @@
+# Merge into the EXISTING proxy project's Compose file; do not replace it.
+# Replace nginx with its real service name. Preserve ALL existing networks.
+services:
+  nginx:
+    networks:
+      - default # Example only: keep the networks already used by your Nginx.
+      - knowledgebase-ingress
+networks:
+  knowledgebase-ingress:
+    external: true
+    name: knowledgebase-ingress
