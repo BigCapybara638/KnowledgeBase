@@ -14,7 +14,13 @@ def test_connect_and_recreate():
         assert second.returncode != 0, 'second server opened the same volume'
         assert b'resource in use' in second.stderr, 'second server failed for a reason unrelated to the instance lock'
         h.recreate_app_with_new_ip()
-        assert c.request(article).status == 200, 'session or article lost after restart'
+        response=c.request(article)
+        assert response.status == 200 and 'Проверка двух Compose-проектов' in response.body, 'session or article lost after restart'
+        h.docker('kill', '--signal=KILL', h.container(h.kb_project,'knowledgebase-app'))
+        h.compose(h.kb_project,'up','-d')
+        h.wait('/readyz','ready')
+        response=c.request(article)
+        assert response.status == 200 and 'Проверка двух Compose-проектов' in response.body, 'committed data or session lost after SIGKILL'
         h.compose(h.kb_project, 'exec', '-T', 'knowledgebase-app', '/app/kb', 'backup')
         metrics = json.loads(h.compose(h.kb_project, 'exec', '-T', 'knowledgebase-app', '/app/kb', 'metrics').stdout)
         assert metrics['limitBytes'] == 768*1024*1024

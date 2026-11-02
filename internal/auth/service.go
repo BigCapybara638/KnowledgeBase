@@ -50,13 +50,13 @@ func (s *Service) CreateUser(ctx context.Context, actor domain.ID, in NewUser) (
 	if e := s.Store.Admin(ctx, actor); e != nil {
 		return domain.User{}, e
 	}
-	return s.create(ctx, in, false)
+	return s.create(ctx, in, false, actor)
 }
 func (s *Service) Bootstrap(ctx context.Context, in NewUser) (domain.User, error) {
 	in.Role = "admin"
-	return s.create(ctx, in, true)
+	return s.create(ctx, in, true, "")
 }
-func (s *Service) create(ctx context.Context, in NewUser, bootstrap bool) (domain.User, error) {
+func (s *Service) create(ctx context.Context, in NewUser, bootstrap bool, actor domain.ID) (domain.User, error) {
 	in.Login = normalize(in.Login)
 	in.Name = strings.TrimSpace(in.Name)
 	if !validLogin.MatchString(in.Login) || in.Name == "" || len(in.Name) > 256 || (in.Role != "admin" && in.Role != "user") {
@@ -75,6 +75,11 @@ func (s *Service) create(ctx context.Context, in NewUser, bootstrap bool) (domai
 			}
 			if n != 0 {
 				return domain.ErrForbidden
+			}
+		}
+		if !bootstrap {
+			if e := storage.AssertActor(ctx, tx, actor, true); e != nil {
+				return e
 			}
 		}
 		_, e := tx.ExecContext(ctx, "INSERT INTO users(id,login,name,password_hash,role,must_change) VALUES(?,?,?,?,?,1)", u.ID, u.Login, u.Name, h, u.Role)
@@ -119,6 +124,9 @@ func (s *Service) ResetPassword(ctx context.Context, admin, id domain.ID, passwo
 		return e
 	}
 	return s.Store.WithWrite(ctx, func(tx *sql.Tx) error {
+		if e := storage.AssertActor(ctx, tx, admin, true); e != nil {
+			return e
+		}
 		r, e := tx.ExecContext(ctx, "UPDATE users SET password_hash=?,must_change=1 WHERE id=?", hash, id)
 		if e != nil {
 			return e
@@ -142,6 +150,9 @@ func (s *Service) SetDisabled(ctx context.Context, admin, id domain.ID, disabled
 		return domain.ErrInvalid
 	}
 	return s.Store.WithWrite(ctx, func(tx *sql.Tx) error {
+		if e := storage.AssertActor(ctx, tx, admin, true); e != nil {
+			return e
+		}
 		r, e := tx.ExecContext(ctx, "UPDATE users SET disabled=? WHERE id=?", disabled, id)
 		if e != nil {
 			return e

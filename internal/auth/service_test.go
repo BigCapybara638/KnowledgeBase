@@ -173,3 +173,34 @@ func TestReadinessFailsWithClosedDB(t *testing.T) {
 		t.Fatal("closed DB ready")
 	}
 }
+
+func TestRevocationWhileCreateWaitsForWriter(t *testing.T) {
+	a, admin := fixture(t)
+	tx, e := a.Store.Write.BeginTx(context.Background(), nil)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer tx.Rollback()
+	before := a.Store.Write.Stats().WaitCount
+	done := make(chan error, 1)
+	go func() {
+		_, e := a.CreateUser(context.Background(), admin, auth.NewUser{Login: "after-revocation", Name: "Blocked", TemporaryPassword: testutil.Password, Role: "user"})
+		done <- e
+	}()
+	deadline := time.Now().Add(8 * time.Second)
+	for a.Store.Write.Stats().WaitCount == before && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if a.Store.Write.Stats().WaitCount == before {
+		t.Fatal("create did not reach writer queue")
+	}
+	if _, e = tx.Exec("UPDATE users SET disabled=1 WHERE id=?", admin); e != nil {
+		t.Fatal(e)
+	}
+	if e = tx.Commit(); e != nil {
+		t.Fatal(e)
+	}
+	if e = <-done; !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("revoked administrator created a user: %v", e)
+	}
+}
