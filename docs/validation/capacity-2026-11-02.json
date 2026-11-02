@@ -1,0 +1,30 @@
+{
+  "articles": 5000,
+  "authors": 5,
+  "conflicts": 1071,
+  "durationSeconds": 600.001701437,
+  "failures": 0,
+  "firstError": "",
+  "publications": 1680,
+  "readers": 50,
+  "reads": 455407,
+  "uploadBytesEach": 10485760,
+  "uploadPixelsEach": 16000000,
+  "uploads": 2,
+  "app": {
+    "currentBytes": 112046080,
+    "peakBytes": 224358400,
+    "limitBytes": 805306368,
+    "oomKills": 0
+  },
+  "proxyBaselineBytes": 5668864,
+  "proxyIncrementalPeakBytes": 25772032,
+  "totalAddedPeakBytes": 250130432,
+  "backupDuringLoad": true,
+  "acceptanceRun": true,
+  "imageID": "sha256:a2a5c2e4e05ac0a972ac91eac90acef1a07523cff7cb06619c7c4f904bb8ef00",
+  "imageSizeBytes": 19292320,
+  "gitCommit": "987fa0c648c1a10c3583cfd71678dcef1a2d6a4c",
+  "timestamp": "2026-11-02T12:26:13Z",
+  "hostCPUs": 5
+}
