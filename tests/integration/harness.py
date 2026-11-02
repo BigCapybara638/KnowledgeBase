@@ -82,7 +82,7 @@ class Harness:
         self.cert_dir = Path(self.tmp.name)
         self.env = {k: v for k, v in os.environ.items() if k not in ('DOCKER_HOST', 'DOCKER_CONTEXT', 'DOCKER_TLS', 'DOCKER_TLS_VERIFY', 'DOCKER_CERT_PATH')}
         self.env['KB_PUBLIC_URL'] = 'https://localhost'
-        self.env.update(KB_IMAGE=os.environ.get('KB_IMAGE', 'knowledgebase:test'), KB_NETWORK_NAME=self.network, KB_ROUTE_FILE=str(ROOT/'deploy/nginx-site.conf.example'), KB_TLS_DIR=str(self.cert_dir))
+        self.env.update(KB_IMAGE=os.environ.get('KB_IMAGE', 'knowledgebase:test'), KB_NETWORK_NAME=self.network, KB_ROUTE_FILE=str(ROOT/'deploy/nginx-site.conf.example'), KB_UPSTREAM_FILE=str(ROOT/'deploy/nginx-upstream.conf.example'), KB_TLS_DIR=str(self.cert_dir))
         self.kb_files = ['-f', str(ROOT/'deploy/compose.yaml'), '-f', str(ROOT/'tests/integration/compose.kb.yaml')]
         self.proxy_files = ['-f', str(ROOT/'tests/integration/compose.proxy.yaml')]
         self.password = secrets.token_urlsafe(24)

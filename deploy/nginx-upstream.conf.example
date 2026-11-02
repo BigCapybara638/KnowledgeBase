@@ -1,0 +1,7 @@
+# Include in http {}, outside server {}. Requires Nginx >= 1.27.3.
+upstream knowledgebase_backend {
+    zone knowledgebase_backend 64k;
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    server knowledgebase-app:8080 resolve;
+    keepalive 64;
+}

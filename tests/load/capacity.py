@@ -36,6 +36,9 @@ with Harness() as h:
     result.update(app=metrics,proxyBaselineBytes=proxy_base,proxyIncrementalPeakBytes=ingress,totalAddedPeakBytes=metrics['peakBytes']+ingress,backupDuringLoad=backed_up,acceptanceRun=args.seconds>=600,imageID=image['Id'],imageSizeBytes=image['Size'],gitCommit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),timestamp=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),hostCPUs=os.cpu_count())
     (output/'capacity.json').write_text(json.dumps(result,indent=2,ensure_ascii=False)+'\n')
     print(json.dumps(result,indent=2,ensure_ascii=False),flush=True)
+    if worker.returncode != 0:
+        (output/'capacity-proxy.log').write_bytes(h.docker('logs',h.proxy_id,check=False).stderr)
+        (output/'capacity-app.log').write_bytes(h.docker('logs',h.container(h.kb_project,'knowledgebase-app'),check=False).stderr)
     assert worker.returncode==0,'load worker failed; see .validation/capacity-worker.log'
     assert metrics['limitBytes']==768*1024*1024 and metrics['oomKills']==0
     assert result['totalAddedPeakBytes']<=1_000_000_000 and ingress<=180*1024*1024

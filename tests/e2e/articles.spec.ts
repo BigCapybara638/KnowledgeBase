@@ -1,0 +1,7 @@
+import {test,expect} from '@playwright/test'
+import {login,createArticle} from './helpers'
+import {mkdirSync} from 'node:fs'
+test('cards and lazy sidebar open stable links and remain usable on mobile',async({page})=>{
+ await login(page);const url=await createArticle(page,'Инструкция по работе команды','Полезные знания для сотрудников');await page.getByRole('button',{name:'Редактировать',exact:true}).click();await page.getByLabel('Название статьи').fill('Обновлённая инструкция');await page.getByRole('button',{name:'Опубликовать',exact:true}).click();await expect(page).toHaveURL(new RegExp(url+'$'));await expect(page.getByRole('heading',{name:'Обновлённая инструкция',exact:true})).toBeVisible();await page.goto('/');const card=page.locator('.article-card').filter({hasText:'Обновлённая инструкция'});await expect(card).toHaveAttribute('href',url);await page.locator('.category-group summary').filter({hasText:'Инструкции'}).click();await expect(page.locator('.sidebar-article').filter({hasText:'Обновлённая инструкция'})).toHaveAttribute('href',url)
+ mkdirSync('.validation',{recursive:true});await page.screenshot({path:'.validation/home-desktop.png',fullPage:true});await page.setViewportSize({width:390,height:844});await expect(card).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);await page.screenshot({path:'.validation/home-mobile.png',fullPage:true});await card.click();await expect(page.locator('.article-body')).toContainText('Полезные знания для сотрудников')
+})

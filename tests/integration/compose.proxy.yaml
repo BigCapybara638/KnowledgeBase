@@ -6,6 +6,7 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ${KB_ROUTE_FILE}:/etc/nginx/knowledgebase-location.conf:ro
+      - ${KB_UPSTREAM_FILE}:/etc/nginx/knowledgebase-upstream.conf:ro
       - ${KB_TLS_DIR}:/tls:ro
     networks:
       - default
