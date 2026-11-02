@@ -200,3 +200,44 @@ func TestGCRespectsDraftAndArticleReferences(t *testing.T) {
 		t.Fatal(e)
 	}
 }
+
+func TestDraftReferencePreservesAccessAfterPublishedImageRemoval(t *testing.T) {
+	s, m, u, d := fixture(t)
+	v := upload(t, m, u, d)
+	c := domain.NewID()
+	s.Write.Exec("INSERT INTO categories(id,title) VALUES(?,'Медиа')", c)
+	a := articles.New(s)
+	d, e := a.SaveDraft(context.Background(), articles.SaveDraftInput{DraftID: d.ID, ActorID: u, CategoryID: c, Title: "Фото", Document: imageDoc(v.ID), ExpectedVersion: d.Version})
+	if e != nil {
+		t.Fatal(e)
+	}
+	pub, e := a.Publish(context.Background(), u, d.ID, d.Version, d.BaseArticleVersion)
+	if e != nil {
+		t.Fatal(e)
+	}
+	other := testutil.User(t, s, "user")
+	kept, e := a.CreateDraft(context.Background(), other, &pub.ID)
+	if e != nil {
+		t.Fatal(e)
+	}
+	remove, e := a.CreateDraft(context.Background(), u, &pub.ID)
+	if e != nil {
+		t.Fatal(e)
+	}
+	remove, e = a.SaveDraft(context.Background(), articles.SaveDraftInput{DraftID: remove.ID, ActorID: u, CategoryID: c, Title: "Без фото", Document: []byte(`{"type":"doc","content":[{"type":"paragraph"}]}`), ExpectedVersion: remove.Version})
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = a.Publish(context.Background(), u, remove.ID, remove.Version, remove.BaseArticleVersion); e != nil {
+		t.Fatal(e)
+	}
+	f, e := m.Open(context.Background(), other, v.ID)
+	if e != nil {
+		t.Errorf("image from own saved draft became unavailable: %v", e)
+	} else {
+		f.Close()
+	}
+	if _, e = a.SaveDraft(context.Background(), articles.SaveDraftInput{DraftID: kept.ID, ActorID: other, CategoryID: c, Title: kept.Title, Document: kept.Document, ExpectedVersion: kept.Version}); e != nil {
+		t.Errorf("own draft cannot be saved after image removed from publication: %v", e)
+	}
+}

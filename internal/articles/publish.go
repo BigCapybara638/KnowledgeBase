@@ -16,6 +16,7 @@ func (s *Service) Publish(ctx context.Context, actor, draftID domain.ID, expecte
 		return domain.Article{}, e
 	}
 	var articleID domain.ID
+	var persisted domain.Article
 	// The expensive JSON validation happens before taking the writer connection.
 	d, e := s.GetDraft(ctx, actor, draftID)
 	if errors.Is(e, domain.ErrNotFound) {
@@ -68,12 +69,16 @@ func (s *Service) Publish(ctx context.Context, actor, draftID domain.ID, expecte
 			return e
 		}
 		_, e = tx.ExecContext(ctx, "DELETE FROM drafts WHERE id=? AND version=?", draftID, expectedDraft)
+		if e != nil {
+			return e
+		}
+		persisted, e = scanArticle(tx.QueryRowContext(ctx, publishedSelect+"WHERE a.id=?", articleID))
 		return e
 	})
 	if e != nil {
 		return domain.Article{}, e
 	}
-	return s.Get(ctx, actor, articleID)
+	return persisted, nil
 }
 func indexArticle(ctx context.Context, tx *sql.Tx, id domain.ID, title, body string, archived bool) error {
 	if _, e := tx.ExecContext(ctx, "DELETE FROM articles_fts WHERE article_id=?", id); e != nil {

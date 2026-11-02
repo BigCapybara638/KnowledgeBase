@@ -130,7 +130,7 @@ func (s *Service) Open(ctx context.Context, actor, id domain.ID) (File, error) {
 		return File{}, domain.ErrNotFound
 	}
 	var m domain.Media
-	e := s.store.Read.QueryRowContext(ctx, `SELECT id,mime,size,width,height FROM media m WHERE id=? AND (owner_id=? OR EXISTS(SELECT 1 FROM article_media am JOIN articles a ON a.id=am.article_id WHERE am.media_id=m.id AND a.published_at IS NOT NULL AND a.archived=0))`, id, actor).Scan(&m.ID, &m.Type, &m.Size, &m.Width, &m.Height)
+	e := s.store.Read.QueryRowContext(ctx, `SELECT id,mime,size,width,height FROM media m WHERE id=? AND (owner_id=? OR EXISTS(SELECT 1 FROM draft_media dm JOIN drafts d ON d.id=dm.draft_id WHERE dm.media_id=m.id AND d.owner_id=?) OR EXISTS(SELECT 1 FROM article_media am JOIN articles a ON a.id=am.article_id WHERE am.media_id=m.id AND a.published_at IS NOT NULL AND a.archived=0))`, id, actor, actor).Scan(&m.ID, &m.Type, &m.Size, &m.Width, &m.Height)
 	if errors.Is(e, sql.ErrNoRows) {
 		return File{}, domain.ErrNotFound
 	}

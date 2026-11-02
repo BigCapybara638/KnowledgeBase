@@ -110,6 +110,7 @@ func (s *Service) SaveDraft(ctx context.Context, in SaveDraftInput) (domain.Draf
 	if e != nil {
 		return domain.Draft{}, e
 	}
+	var saved domain.Draft
 	e = s.store.WithWrite(ctx, func(tx *sql.Tx) error {
 		if e := storage.AssertActor(ctx, tx, in.ActorID, false); e != nil {
 			return e
@@ -141,17 +142,18 @@ func (s *Service) SaveDraft(ctx context.Context, in SaveDraftInput) (domain.Draf
 		if n != 1 {
 			return domain.ErrConflict
 		}
-		return nil
+		saved, e = scanDraft(tx.QueryRowContext(ctx, draftSelect+"WHERE id=? AND owner_id=?", in.DraftID, in.ActorID))
+		return e
 	})
 	if e != nil {
 		return domain.Draft{}, e
 	}
-	return s.GetDraft(ctx, in.ActorID, in.DraftID)
+	return saved, nil
 }
 func syncDraftMedia(ctx context.Context, tx *sql.Tx, actor, draft domain.ID, ids []domain.ID) error {
 	for _, id := range ids {
 		var n int
-		e := tx.QueryRowContext(ctx, `SELECT count(*) FROM media m WHERE m.id=? AND (m.owner_id=? OR EXISTS(SELECT 1 FROM article_media am JOIN articles a ON a.id=am.article_id WHERE am.media_id=m.id AND a.published_at IS NOT NULL AND a.archived=0))`, id, actor).Scan(&n)
+		e := tx.QueryRowContext(ctx, `SELECT count(*) FROM media m WHERE m.id=? AND (m.owner_id=? OR EXISTS(SELECT 1 FROM draft_media dm JOIN drafts d ON d.id=dm.draft_id WHERE dm.media_id=m.id AND d.owner_id=?) OR EXISTS(SELECT 1 FROM article_media am JOIN articles a ON a.id=am.article_id WHERE am.media_id=m.id AND a.published_at IS NOT NULL AND a.archived=0))`, id, actor, actor).Scan(&n)
 		if e != nil {
 			return e
 		}
