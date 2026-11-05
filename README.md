@@ -36,3 +36,5 @@ Playwright использует установленный `/usr/bin/chromium`, 
 ## Редактор и оформление
 
 Тёмная тема Axentris, локальный Inter, импорт `.docx`, цвета текста/ячеек, размеры таблиц и видео: [инструкция и ограничения](docs/editor-upgrades.md).
+
+Для запуска на ПК через Docker: `docker compose -f conpose-local.yaml up -d --build`, затем http://127.0.0.1:8080. При первом запуске сначала создайте администратора: [локальный Compose и диагностика входа](docs/operations.md#локально-через-docker-compose).

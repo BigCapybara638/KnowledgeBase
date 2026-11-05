@@ -1,0 +1,33 @@
+# Local development only. Open exactly http://127.0.0.1:8080.
+name: knowledgebase-local
+services:
+  knowledgebase-app:
+    build:
+      context: .
+    image: knowledgebase:local
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:8080:8080'
+    environment:
+      KB_DEV: 'true'
+      KB_PUBLIC_URL: http://127.0.0.1:8080
+      KB_LISTEN_ADDR: ':8080'
+      KB_DATA_DIR: /data
+      KB_BACKUP_DIR: /backups
+    volumes:
+      - data:/data
+      - backups:/backups
+    healthcheck:
+      test: [CMD, /app/kb, check]
+      interval: 10s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+    mem_limit: 768m
+    stop_grace_period: 30s
+volumes:
+  data:
+    # Reuse data from the previously documented docker run setup.
+    name: knowledgebase-local-data
+  backups:
+    name: knowledgebase-local-backups

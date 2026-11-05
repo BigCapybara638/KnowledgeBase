@@ -105,3 +105,57 @@ docker compose exec -T knowledgebase-app /app/kb metrics
 `metrics` читает cgroup v2: current, peak, limit и OOM-kill count. Это включает файловый кеш, а не только heap Go; отсутствие метрик возвращает ошибку. Сама команда кратковременно добавляет процесс в тот же cgroup. `/readyz` проверяет SQLite, `/healthz` — HTTP; ни один не заменяет функциональную проверку входа/статьи.
 
 Для локальной разработки без HTTPS: `KB_DEV=true`, `KB_PUBLIC_URL=http://127.0.0.1:8080`, `KB_DATA_DIR=./data`. HTTP dev-режим разрешён только для loopback-адресов; production Compose его не включает.
+
+## Локально через Docker Compose
+
+Из корня репозитория используйте `conpose-local.yaml` (имя файла оставлено по запросу). Node.js и Go на ПК не нужны. Конфигурация предназначена для локального запуска и открывает порт только на `127.0.0.1`.
+
+Если раньше приложение запускалось командой `docker run --name knowledgebase-local ...`, сначала остановите **этот** контейнер:
+
+```sh
+docker stop knowledgebase-local
+```
+
+Compose использует тот же том `knowledgebase-local-data`, поэтому пользователи и статьи сохраняются. Не запускайте старый контейнер и Compose одновременно над этим томом. Если данные ранее хранились в другом томе или в папке, сначала укажите существующее хранилище в конфигурации, не удаляйте его.
+
+Если администратор уже есть:
+
+```sh
+git switch feat/knowledge-base
+git pull --ff-only
+docker compose -f conpose-local.yaml up -d --build
+```
+
+Откройте **http://127.0.0.1:8080/login**. После обновления страницы тема будет соответствовать системной; последующие изменения системной темы применяются сразу.
+
+При самом первом запуске, на пустом томе, сначала соберите образ и создайте администратора **до запуска сервера**. В Bash / Git Bash / WSL:
+
+```bash
+docker compose -f conpose-local.yaml build
+read -r -s -p 'Временный пароль администратора: ' kb_bootstrap_password
+printf '\n'
+printf '%s\n' "$kb_bootstrap_password" | docker compose -f conpose-local.yaml run --rm --no-deps -T knowledgebase-app admin create --login admin --name 'Администратор' --password-stdin
+unset kb_bootstrap_password
+docker compose -f conpose-local.yaml up -d
+```
+
+Если Compose уже запущен над пустой базой, остановите сервис перед созданием администратора: `docker compose -f conpose-local.yaml stop knowledgebase-app`. Команда создания откажется менять непустую базу: повторно создавать администратора при обновлениях не нужно.
+
+Диагностика и остановка:
+
+```sh
+docker compose -f conpose-local.yaml ps
+docker compose -f conpose-local.yaml logs --tail=50 knowledgebase-app
+docker compose -f conpose-local.yaml exec knowledgebase-app /app/kb check
+docker compose -f conpose-local.yaml down
+```
+
+Обычный `down` сохраняет тома. Не добавляйте `--volumes` / `-v`, если хотите сохранить данные.
+
+### Если при входе возникает 403
+
+Адрес в браузере должен точно совпадать с `KB_PUBLIC_URL`: схема, имя хоста и порт. В локальном Compose это `http://127.0.0.1:8080`; `localhost` считается другим источником. Настройки фиксированы в YAML и не зависят от производственного `.env`.
+
+После перехода со старого контейнера откройте `/login` заново и повторите вход. При сообщении «Недопустимый запрос. Обновите страницу.» очистите данные сайта для `127.0.0.1` или проверьте вход в приватном окне: форма и CSRF-cookie должны относиться к одному запуску приложения. Не отключайте CSRF-проверку.
+
+Неверный пароль или временное ограничение попыток входа возвращают 401, а не 403. Если ошибка остаётся, нужны точный текст ответа и сведения о контейнере, обслуживающем порт 8080. Пароли и содержимое базы для диагностики не присылайте.
