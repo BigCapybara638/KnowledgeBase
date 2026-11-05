@@ -108,7 +108,7 @@ docker compose exec -T knowledgebase-app /app/kb metrics
 
 ## Локально через Docker Compose
 
-Из корня репозитория используйте `conpose-local.yaml` (имя файла оставлено по запросу). Node.js и Go на ПК не нужны. Конфигурация предназначена для локального запуска и открывает порт только на `127.0.0.1`.
+Из корня репозитория используйте `compose-local.yaml`. Node.js и Go на ПК не нужны. Конфигурация предназначена для локального запуска и открывает порт только на `127.0.0.1`.
 
 Если раньше приложение запускалось командой `docker run --name knowledgebase-local ...`, сначала остановите **этот** контейнер:
 
@@ -123,7 +123,7 @@ Compose использует тот же том `knowledgebase-local-data`, по
 ```sh
 git switch feat/knowledge-base
 git pull --ff-only
-docker compose -f conpose-local.yaml up -d --build
+docker compose -f compose-local.yaml up -d --build
 ```
 
 Откройте **http://127.0.0.1:8080/login**. После обновления страницы тема будет соответствовать системной; последующие изменения системной темы применяются сразу.
@@ -131,23 +131,23 @@ docker compose -f conpose-local.yaml up -d --build
 При самом первом запуске, на пустом томе, сначала соберите образ и создайте администратора **до запуска сервера**. В Bash / Git Bash / WSL:
 
 ```bash
-docker compose -f conpose-local.yaml build
+docker compose -f compose-local.yaml build
 read -r -s -p 'Временный пароль администратора: ' kb_bootstrap_password
 printf '\n'
-printf '%s\n' "$kb_bootstrap_password" | docker compose -f conpose-local.yaml run --rm --no-deps -T knowledgebase-app admin create --login admin --name 'Администратор' --password-stdin
+printf '%s\n' "$kb_bootstrap_password" | docker compose -f compose-local.yaml run --rm --no-deps -T knowledgebase-app admin create --login admin --name 'Администратор' --password-stdin
 unset kb_bootstrap_password
-docker compose -f conpose-local.yaml up -d
+docker compose -f compose-local.yaml up -d
 ```
 
-Если Compose уже запущен над пустой базой, остановите сервис перед созданием администратора: `docker compose -f conpose-local.yaml stop knowledgebase-app`. Команда создания откажется менять непустую базу: повторно создавать администратора при обновлениях не нужно.
+Если Compose уже запущен над пустой базой, остановите сервис перед созданием администратора: `docker compose -f compose-local.yaml stop knowledgebase-app`. Команда создания откажется менять непустую базу: повторно создавать администратора при обновлениях не нужно.
 
 Диагностика и остановка:
 
 ```sh
-docker compose -f conpose-local.yaml ps
-docker compose -f conpose-local.yaml logs --tail=50 knowledgebase-app
-docker compose -f conpose-local.yaml exec knowledgebase-app /app/kb check
-docker compose -f conpose-local.yaml down
+docker compose -f compose-local.yaml ps
+docker compose -f compose-local.yaml logs --tail=50 knowledgebase-app
+docker compose -f compose-local.yaml exec knowledgebase-app /app/kb check
+docker compose -f compose-local.yaml down
 ```
 
 Обычный `down` сохраняет тома. Не добавляйте `--volumes` / `-v`, если хотите сохранить данные.
@@ -159,3 +159,26 @@ docker compose -f conpose-local.yaml down
 После перехода со старого контейнера откройте `/login` заново и повторите вход. При сообщении «Недопустимый запрос. Обновите страницу.» очистите данные сайта для `127.0.0.1` или проверьте вход в приватном окне: форма и CSRF-cookie должны относиться к одному запуску приложения. Не отключайте CSRF-проверку.
 
 Неверный пароль или временное ограничение попыток входа возвращают 401, а не 403. Если ошибка остаётся, нужны точный текст ответа и сведения о контейнере, обслуживающем порт 8080. Пароли и содержимое базы для диагностики не присылайте.
+
+### Если вчерашний пароль перестал работать
+
+Пароли находятся в SQLite-базе в каталоге `/data`, а не в Docker-образе. Пересборка образа и пересоздание контейнера с **тем же** хранилищем не сбрасывают их. Локальный Compose всегда подключает том с явным именем `knowledgebase-local-data`; учётная запись из другого тома или bind-папки в нём не появится автоматически.
+
+1. После пяти неверных попыток вход ограничивается на 10 минут. Дождитесь окончания окна и повторите вход с правильным логином. Сообщение в форме одинаково для неверных данных и ограничения попыток.
+2. Посмотрите контейнеры и тома без удаления:
+
+   ```sh
+   docker ps -a --format "{{.Names}} | {{.Image}} | {{.Status}}"
+   docker volume ls --format "{{.Name}}"
+   ```
+
+3. Для старого и нового контейнера посмотрите только подключения хранилищ (замените `ИМЯ_КОНТЕЙНЕРА` на найденное имя):
+
+   ```sh
+   docker inspect ИМЯ_КОНТЕЙНЕРА --format '{{range .Mounts}}{{println .Type .Name .Source "->" .Destination}}{{end}}'
+   ```
+
+   Сравните источник, подключённый к `/data`. Другое имя тома или другой путь означает другую базу. Сначала определите старое хранилище и сохраните его; не переносите SQLite-файлы из работающего сервера простым копированием.
+4. Если сервер уже использовал тот же том, проверьте раскладку, точный логин и блокировку. Для сброса пароля используйте другого администратора через «Управление → Сотрудники»; создание нового первого администратора не изменяет непустую базу.
+
+Не выполняйте `docker compose down -v`, `docker volume rm` или `docker system prune --volumes` для исправления входа. Если прежний запуск был без постоянного тома, данные могут оставаться в файловой системе старого контейнера — сохраните его до диагностики.
