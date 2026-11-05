@@ -7,10 +7,12 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@fontsource/inter": "5.2.8",
     "@tiptap/core": "3.32.2",
     "@tiptap/extension-image": "3.32.2",
     "@tiptap/extension-table": "3.32.2",
     "@tiptap/starter-kit": "3.32.2",
+    "fflate": "0.8.2",
     "htmx.org": "2.0.11"
   },
   "devDependencies": {

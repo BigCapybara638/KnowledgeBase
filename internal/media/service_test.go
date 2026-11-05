@@ -15,6 +15,7 @@ import (
 	"image"
 	"image/png"
 	"io"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -239,5 +240,47 @@ func TestDraftReferencePreservesAccessAfterPublishedImageRemoval(t *testing.T) {
 	}
 	if _, e = a.SaveDraft(context.Background(), articles.SaveDraftInput{DraftID: kept.ID, ActorID: other, CategoryID: c, Title: kept.Title, Document: kept.Document, ExpectedVersion: kept.Version}); e != nil {
 		t.Errorf("own draft cannot be saved after image removed from publication: %v", e)
+	}
+}
+
+func TestVideoUploadAndPublishRetainsProtection(t *testing.T) {
+	s, m, u, d := fixture(t)
+	data, err := os.ReadFile("../../tests/e2e/fixtures/clip.webm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	video, err := m.Upload(context.Background(), u, d.ID, bytes.NewReader(data), "clip.webm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if video.Type != "video/webm" {
+		t.Fatal(video.Type)
+	}
+	other := testutil.User(t, s, "user")
+	if f, err := m.Open(context.Background(), other, video.ID); err == nil {
+		f.Close()
+		t.Fatal("private video leaked")
+	}
+	category := domain.NewID()
+	if _, err = s.Write.Exec("INSERT INTO categories(id,title) VALUES(?,'Видео')", category); err != nil {
+		t.Fatal(err)
+	}
+	doc, _ := json.Marshal(map[string]any{"type": "doc", "content": []any{map[string]any{"type": "video", "attrs": map[string]any{"src": "/media/" + string(video.ID), "title": "Обучение"}}}})
+	service := articles.New(s)
+	d, err = service.SaveDraft(context.Background(), articles.SaveDraftInput{DraftID: d.ID, ActorID: u, CategoryID: category, Title: "Видео", Document: doc, ExpectedVersion: d.Version})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.Publish(context.Background(), u, d.ID, d.Version, d.BaseArticleVersion); err != nil {
+		t.Fatal(err)
+	}
+	f, err := m.Open(context.Background(), other, video.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+	if f, err := m.Open(context.Background(), "", video.ID); err == nil {
+		f.Close()
+		t.Fatal("guest video leaked")
 	}
 }

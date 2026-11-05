@@ -7,7 +7,7 @@ import (
 )
 
 func passwordHash(password string) ([]byte, error) {
-	if !utf8.ValidString(password) || utf8.RuneCountInString(password) < 12 || len(password) > 72 {
+	if !utf8.ValidString(password) || utf8.RuneCountInString(password) < 8 || len(password) > 72 {
 		return nil, domain.ErrInvalid
 	}
 	return bcrypt.GenerateFromPassword([]byte(password), 12)

@@ -105,7 +105,7 @@ func (a *App) middleware(next http.Handler) http.Handler {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "same-origin")
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; media-src 'self' https: http:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
 		if r.Method != "GET" && r.Method != "HEAD" && r.Method != "OPTIONS" {
 			if origin := r.Header.Get("Origin"); origin != "" && origin != a.cfg.PublicURL {
 				http.Error(w, "Недопустимый источник запроса", 403)

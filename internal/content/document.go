@@ -112,7 +112,7 @@ func validChild(parent, child string) bool {
 	case "":
 		return child == "doc"
 	case "doc", "blockquote", "listItem", "tableCell", "tableHeader":
-		return child == "image" || child == "table" || child == "paragraph" || child == "heading" || child == "blockquote" || child == "bulletList" || child == "orderedList" || child == "codeBlock" || child == "horizontalRule"
+		return child == "video" || child == "image" || child == "table" || child == "paragraph" || child == "heading" || child == "blockquote" || child == "bulletList" || child == "orderedList" || child == "codeBlock" || child == "horizontalRule"
 	case "bulletList", "orderedList":
 		return child == "listItem"
 	case "paragraph", "heading":
@@ -153,6 +153,16 @@ func (r *renderer) render(n node, parent string, depth int) error {
 				tag = "s"
 			case "code":
 				tag = "code"
+			case "textStyle":
+				if !attrsOnly(m.Attrs, "color", "backgroundColor") {
+					return domain.ErrInvalid
+				}
+				style, err := colorStyle(m.Attrs)
+				if err != nil {
+					return err
+				}
+				text = `<span style="` + style + `">` + text + `</span>`
+				continue
 			case "link":
 				if !attrsOnly(m.Attrs, "href", "target", "rel", "class") {
 					return domain.ErrInvalid
@@ -173,6 +183,34 @@ func (r *renderer) render(n node, parent string, depth int) error {
 		}
 		r.html.WriteString(text)
 		r.plain.WriteString(n.Text)
+		return nil
+	}
+	if n.Type == "video" {
+		if !attrsOnly(n.Attrs, "src", "title") || len(n.Content) != 0 {
+			return domain.ErrInvalid
+		}
+		src, err := str(n.Attrs, "src")
+		if err != nil {
+			return err
+		}
+		if strings.HasPrefix(src, "/media/") {
+			id := strings.TrimPrefix(src, "/media/")
+			if _, err = uuid.Parse(id); err != nil {
+				return domain.ErrInvalid
+			}
+			r.media = append(r.media, domain.ID(id))
+		} else {
+			u, err := url.Parse(src)
+			if err != nil || !safeLink(src) || (u.Scheme != "https" && u.Scheme != "http") {
+				return domain.ErrInvalid
+			}
+		}
+		title, err := str(n.Attrs, "title")
+		if err != nil {
+			return err
+		}
+		r.html.WriteString(`<video controls preload="metadata" src="` + html.EscapeString(src) + `" title="` + html.EscapeString(title) + `"><a href="` + html.EscapeString(src) + `" rel="noopener noreferrer">Открыть видео</a></video>`)
+		r.plain.WriteString(" " + title + " ")
 		return nil
 	}
 	if n.Type == "image" {
@@ -210,10 +248,13 @@ func (r *renderer) render(n node, parent string, depth int) error {
 	case "doc":
 	case "table":
 		tag = "table"
+		if width := tableWidth(n); width > 0 {
+			extra = ` style="width:` + strconv.Itoa(width) + `px"`
+		}
 	case "tableRow":
 		tag = "tr"
 	case "tableCell", "tableHeader":
-		if !attrsOnly(n.Attrs, "colspan", "rowspan", "colwidth", "align") {
+		if !attrsOnly(n.Attrs, "colspan", "rowspan", "colwidth", "align", "height", "backgroundColor") {
 			return domain.ErrInvalid
 		}
 		col, e := number(n.Attrs, "colspan", 1, 1, 100)
@@ -235,6 +276,13 @@ func (r *renderer) render(n node, parent string, depth int) error {
 		extra = ` colspan="` + strconv.Itoa(col) + `" rowspan="` + strconv.Itoa(row) + `"`
 		if align != "" {
 			extra += ` align="` + align + `"`
+		}
+		style, err := cellStyle(n.Attrs, col)
+		if err != nil {
+			return err
+		}
+		if style != "" {
+			extra += ` style="` + style + `"`
 		}
 	case "paragraph":
 		tag = "p"

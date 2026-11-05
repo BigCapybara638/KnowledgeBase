@@ -13,6 +13,7 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -58,16 +59,21 @@ func (s *Service) Upload(ctx context.Context, actor, draft domain.ID, source io.
 	if len(b) > 10<<20 {
 		return domain.Media{}, domain.ErrInvalid
 	}
-	cfg, format, e := image.DecodeConfig(bytes.NewReader(b))
-	if e != nil || cfg.Width <= 0 || cfg.Height <= 0 || cfg.Width > 25000000/cfg.Height {
-		return domain.Media{}, domain.ErrInvalid
-	}
-	mime := map[string]string{"jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp"}[format]
-	if mime == "" {
-		return domain.Media{}, domain.ErrInvalid
-	}
-	if _, _, e = image.Decode(bytes.NewReader(b)); e != nil {
-		return domain.Media{}, domain.ErrInvalid
+	cfg := image.Config{}
+	mime := http.DetectContentType(b)
+	if mime != "video/mp4" && mime != "video/webm" && mime != "video/ogg" {
+		var format string
+		cfg, format, e = image.DecodeConfig(bytes.NewReader(b))
+		if e != nil || cfg.Width <= 0 || cfg.Height <= 0 || cfg.Width > 25000000/cfg.Height {
+			return domain.Media{}, domain.ErrInvalid
+		}
+		mime = map[string]string{"jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp"}[format]
+		if mime == "" {
+			return domain.Media{}, domain.ErrInvalid
+		}
+		if _, _, e = image.Decode(bytes.NewReader(b)); e != nil {
+			return domain.Media{}, domain.ErrInvalid
+		}
 	}
 	lock, e := storage.AcquireFileLock(s.store.DataDir, "media.lock", false, false)
 	if e != nil {
