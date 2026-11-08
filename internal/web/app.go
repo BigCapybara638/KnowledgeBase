@@ -68,6 +68,7 @@ func New(cfg config.Config, s *storage.Store, accounts *auth.Service) (*App, err
 		p.Post("/articles/{id}/drafts", a.createDraft)
 		p.Get("/drafts/{id}/edit", a.editor)
 		p.Put("/drafts/{id}", a.saveDraft)
+		p.Post("/drafts/{id}/delete", a.deleteDraft)
 		p.Post("/drafts/{id}/media", a.uploadImage)
 		p.Get("/media/{id}", a.getImage)
 		p.Post("/drafts/{id}/publish", a.publishDraft)
