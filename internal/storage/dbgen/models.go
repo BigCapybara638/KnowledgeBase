@@ -63,6 +63,16 @@ type LoginLimit struct {
 	WindowStart int64  `json:"window_start"`
 }
 
+type McpToken struct {
+	ID        string `json:"id"`
+	UserID    string `json:"user_id"`
+	Name      string `json:"name"`
+	TokenHash string `json:"token_hash"`
+	CreatedAt int64  `json:"created_at"`
+	ExpiresAt int64  `json:"expires_at"`
+	RevokedAt int64  `json:"revoked_at"`
+}
+
 type Medium struct {
 	ID        string `json:"id"`
 	OwnerID   string `json:"owner_id"`

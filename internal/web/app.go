@@ -16,6 +16,7 @@ import (
 	"github.com/BigCapybara638/KnowledgeBase/internal/categories"
 	"github.com/BigCapybara638/KnowledgeBase/internal/config"
 	"github.com/BigCapybara638/KnowledgeBase/internal/domain"
+	"github.com/BigCapybara638/KnowledgeBase/internal/mcpserver"
 	"github.com/BigCapybara638/KnowledgeBase/internal/media"
 	"github.com/BigCapybara638/KnowledgeBase/internal/search"
 	"github.com/BigCapybara638/KnowledgeBase/internal/storage"
@@ -35,6 +36,7 @@ type App struct {
 	accounts   *auth.Service
 	router     chi.Router
 	handler    http.Handler
+	mcpHandler http.Handler
 	views      *template.Template
 }
 
@@ -48,6 +50,7 @@ func New(cfg config.Config, s *storage.Store, accounts *auth.Service) (*App, err
 	a.media = media.New(s)
 	a.articles = articles.New(s)
 	a.categories = categories.New(s)
+	a.mcpHandler = mcpserver.New(cfg, s, accounts)
 	r := a.router
 	r.Get("/login", a.loginPage)
 	r.Post("/login", a.login)
@@ -62,6 +65,9 @@ func New(cfg config.Config, s *storage.Store, accounts *auth.Service) (*App, err
 		p.Use(a.requireContent)
 		p.Get("/", a.home)
 		p.Get("/search", a.searchPage)
+		p.Get("/settings/mcp", a.mcpTokensPage)
+		p.Post("/settings/mcp", a.createMCPToken)
+		p.Post("/settings/mcp/{id}/revoke", a.revokeMCPToken)
 		p.Get("/articles/{id}", a.article)
 		p.Get("/drafts", a.draftsPage)
 		p.Post("/drafts", a.createDraft)
@@ -90,6 +96,10 @@ func New(cfg config.Config, s *storage.Store, accounts *auth.Service) (*App, err
 	return a, nil
 }
 func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/mcp" {
+		a.mcpHandler.ServeHTTP(w, r)
+		return
+	}
 	if r.URL.Path == "/readyz" || r.URL.Path == "/healthz" {
 		HealthRoutes(a.store).ServeHTTP(w, r)
 		return
