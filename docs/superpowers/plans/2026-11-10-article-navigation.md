@@ -24,3 +24,11 @@
 4. Remove category filter links, home filter handling and category-specific pagination; redirect old filter URLs to `/`. Keep admin category CRUD and grouped article menu. Verify home pagination and redirects; commit `refactor: remove category listing screens`.
 
 For each task, run focused regression checks before committing. Run the complete Go suite, vet, UI build and browser suite before completion, then review the complete diff.
+
+## Verification results
+
+- Tasks 1–4 implemented; regression checks observed failing before implementation and passing afterwards for active menus, neighbor selection/rendering, and removed category listings.
+- Complete `go test -trimpath ./...` and `go vet ./...` passed in the Go 1.27.3 Docker environment.
+- Production Vite and Go builds passed. Existing HTMX eval build warning remains.
+- Complete Playwright suite passed: 21/21 in Edge, using an isolated Docker database. Navigation also checked at 1440px/390px in light/dark themes; screenshots are under `.validation/navigation-*.png`.
+- Independent review found no Critical/Important issues. Optional follow-ups: auto-scroll the menu to its active item; browser coverage of actual load-more with 100+ entries (current HTTP coverage checks pagination and active state beyond 50).

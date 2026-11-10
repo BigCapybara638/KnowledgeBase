@@ -17,12 +17,11 @@ func pageNumber(r *http.Request) int {
 	return n
 }
 func (a *App) home(w http.ResponseWriter, r *http.Request) {
-	var cat *domain.ID
-	if id := r.URL.Query().Get("category"); id != "" {
-		v := domain.ID(id)
-		cat = &v
+	if r.URL.Query().Has("category") {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
 	}
-	p, e := a.articles.List(r.Context(), currentUser(r).ID, cat, pageNumber(r))
+	p, e := a.articles.List(r.Context(), currentUser(r).ID, nil, pageNumber(r))
 	if e != nil {
 		a.fail(w, r, e)
 		return
@@ -32,11 +31,7 @@ func (a *App) home(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, r, e)
 		return
 	}
-	selected := ""
-	if cat != nil {
-		selected = string(*cat)
-	}
-	a.view(w, r, 200, "home.html", map[string]any{"Title": "Все статьи", "Categories": cats, "Articles": p.Items, "Page": p.Page, "NextPage": p.Page + 1, "PrevPage": p.Page - 1, "HasNext": p.HasNext, "SelectedCategory": selected})
+	a.view(w, r, 200, "home.html", map[string]any{"Title": "Все статьи", "Categories": cats, "Articles": p.Items, "Page": p.Page, "NextPage": p.Page + 1, "PrevPage": p.Page - 1, "HasNext": p.HasNext})
 }
 func (a *App) article(w http.ResponseWriter, r *http.Request) {
 	item, e := a.articles.Get(r.Context(), currentUser(r).ID, domain.ID(chi.URLParam(r, "id")))
@@ -59,7 +54,7 @@ func (a *App) article(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, r, e)
 		return
 	}
-	a.view(w, r, 200, "article.html", map[string]any{"Title": item.Title, "Article": item, "Rendered": rendered.HTML, "Categories": cats, "SelectedCategory": string(item.CategoryID), "CurrentArticleID": item.ID, "Neighbors": neighbors})
+	a.view(w, r, 200, "article.html", map[string]any{"Title": item.Title, "Article": item, "Rendered": rendered.HTML, "Categories": cats, "CurrentArticleID": item.ID, "Neighbors": neighbors})
 }
 func (a *App) categoryMenu(w http.ResponseWriter, r *http.Request) {
 	id := domain.ID(chi.URLParam(r, "id"))

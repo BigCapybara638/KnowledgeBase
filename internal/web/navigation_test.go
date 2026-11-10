@@ -75,3 +75,23 @@ func TestArticleNavigationLinks(t *testing.T) {
 		t.Fatal("navigation must follow the article")
 	}
 }
+
+func TestCategoryListingRedirectsHome(t *testing.T) {
+	_, get := navigationFixture(t, 21)
+	for _, path := range []string{"/?category=instructions", "/?category=missing&page=2", "/?category="} {
+		w := get(path)
+		if w.Code != http.StatusSeeOther || w.Header().Get("Location") != "/" {
+			t.Fatalf("old category URL %s must return home: %d %s", path, w.Code, w.Header().Get("Location"))
+		}
+	}
+	first := get("/")
+	second := get("/?page=2")
+	if first.Code != 200 || second.Code != 200 || strings.Count(first.Body.String(), `class="article-card"`) != 20 || strings.Count(second.Body.String(), `class="article-card"`) != 1 {
+		t.Fatalf("home pagination broken: %d / %d", first.Code, second.Code)
+	}
+	for _, body := range []string{first.Body.String(), second.Body.String(), get("/articles/article-000").Body.String()} {
+		if strings.Contains(body, `href="/?category=`) || strings.Contains(body, "&amp;category=") || strings.Contains(body, "Сбросить категорию") {
+			t.Fatal("category listing link remains")
+		}
+	}
+}
