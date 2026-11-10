@@ -76,7 +76,7 @@ func (s *Service) List(ctx context.Context, actor domain.ID, category *domain.ID
 	}
 	return p, rows.Err()
 }
-func (s *Service) ListCategoryMenu(ctx context.Context, actor, category domain.ID, cursor string) (MenuPage, error) {
+func (s *Service) ListCategoryMenu(ctx context.Context, actor, category domain.ID, cursor string, current domain.ID) (MenuPage, error) {
 	if _, e := s.store.Editor(ctx, actor); e != nil {
 		return MenuPage{}, e
 	}
@@ -88,7 +88,17 @@ func (s *Service) ListCategoryMenu(ctx context.Context, actor, category domain.I
 			return MenuPage{}, domain.ErrInvalid
 		}
 	}
-	rows, e := s.store.Read.QueryContext(ctx, "SELECT id,title FROM articles WHERE category_id=? AND published_at IS NOT NULL AND archived=0 ORDER BY title COLLATE NOCASE,id LIMIT 51 OFFSET ?", category, offset)
+	limit := 50
+	if cursor == "" && current != "" {
+		var preceding int
+		e := s.store.Read.QueryRowContext(ctx, `SELECT count(*) FROM articles a JOIN articles current ON current.id=? AND current.category_id=a.category_id AND current.published_at IS NOT NULL AND current.archived=0
+			WHERE a.category_id=? AND a.published_at IS NOT NULL AND a.archived=0 AND (a.title COLLATE NOCASE,a.id)<(current.title COLLATE NOCASE,current.id)`, current, category).Scan(&preceding)
+		if e != nil {
+			return MenuPage{}, e
+		}
+		limit = (preceding/50 + 1) * 50
+	}
+	rows, e := s.store.Read.QueryContext(ctx, "SELECT id,title FROM articles WHERE category_id=? AND published_at IS NOT NULL AND archived=0 ORDER BY title COLLATE NOCASE,id LIMIT ? OFFSET ?", category, limit+1, offset)
 	if e != nil {
 		return MenuPage{}, e
 	}
@@ -101,9 +111,9 @@ func (s *Service) ListCategoryMenu(ctx context.Context, actor, category domain.I
 		}
 		p.Items = append(p.Items, a)
 	}
-	if len(p.Items) > 50 {
-		p.Items = p.Items[:50]
-		p.Next = strconv.Itoa(offset + 50)
+	if len(p.Items) > limit {
+		p.Items = p.Items[:limit]
+		p.Next = strconv.Itoa(offset + limit)
 	}
 	return p, rows.Err()
 }

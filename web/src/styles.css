@@ -110,3 +110,4 @@ body{font-family:Inter,ui-sans-serif,system-ui,sans-serif}
 .empty-state>.link{display:inline-block;margin-top:var(--space-4)}
 @media(max-width:1100px){:root{--page-padding:var(--space-6)}}
 @media(max-width:700px){:root{--page-padding:var(--space-4);--panel-padding:var(--space-4)}}
+.sidebar-article[aria-current="page"]{background:var(--primary-container);color:var(--on-primary-container);border-radius:7px;font-weight:650}

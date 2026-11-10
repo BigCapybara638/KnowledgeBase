@@ -54,16 +54,17 @@ func (a *App) article(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, r, e)
 		return
 	}
-	a.view(w, r, 200, "article.html", map[string]any{"Title": item.Title, "Article": item, "Rendered": rendered.HTML, "Categories": cats, "SelectedCategory": string(item.CategoryID)})
+	a.view(w, r, 200, "article.html", map[string]any{"Title": item.Title, "Article": item, "Rendered": rendered.HTML, "Categories": cats, "SelectedCategory": string(item.CategoryID), "CurrentArticleID": item.ID})
 }
 func (a *App) categoryMenu(w http.ResponseWriter, r *http.Request) {
 	id := domain.ID(chi.URLParam(r, "id"))
-	p, e := a.articles.ListCategoryMenu(r.Context(), currentUser(r).ID, id, r.URL.Query().Get("cursor"))
+	current := domain.ID(r.URL.Query().Get("current"))
+	p, e := a.articles.ListCategoryMenu(r.Context(), currentUser(r).ID, id, r.URL.Query().Get("cursor"), current)
 	if e != nil {
 		a.fail(w, r, e)
 		return
 	}
-	a.view(w, r, 200, "sidebar_articles.html", map[string]any{"Menu": p, "CategoryID": id})
+	a.view(w, r, 200, "sidebar_articles.html", map[string]any{"Menu": p, "CategoryID": id, "CurrentArticleID": current})
 }
 func (a *App) categoriesPage(w http.ResponseWriter, r *http.Request) {
 	if e := a.store.Admin(r.Context(), currentUser(r).ID); e != nil {
