@@ -58,3 +58,20 @@ func TestSidebarCurrentArticle(t *testing.T) {
 		t.Fatal("home menu must not mark an article")
 	}
 }
+
+func TestArticleNavigationLinks(t *testing.T) {
+	_, get := navigationFixture(t, 3)
+	w := get("/articles/article-001")
+	if w.Code != 200 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	for _, pattern := range []string{`<nav[^>]*aria-label="Навигация по статьям"`, `<a[^>]*href="/articles/article-000"[^>]*rel="prev"`, `<a[^>]*href="/articles/article-002"[^>]*rel="next"`} {
+		if !regexp.MustCompile(pattern).MatchString(body) {
+			t.Fatalf("missing article navigation %s: %s", pattern, body)
+		}
+	}
+	if strings.Index(body, `aria-label="Навигация по статьям"`) < strings.Index(body, "</article>") {
+		t.Fatal("navigation must follow the article")
+	}
+}

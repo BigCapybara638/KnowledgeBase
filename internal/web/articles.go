@@ -54,7 +54,12 @@ func (a *App) article(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, r, e)
 		return
 	}
-	a.view(w, r, 200, "article.html", map[string]any{"Title": item.Title, "Article": item, "Rendered": rendered.HTML, "Categories": cats, "SelectedCategory": string(item.CategoryID), "CurrentArticleID": item.ID})
+	neighbors, e := a.articles.Neighbors(r.Context(), currentUser(r).ID, item.ID)
+	if e != nil {
+		a.fail(w, r, e)
+		return
+	}
+	a.view(w, r, 200, "article.html", map[string]any{"Title": item.Title, "Article": item, "Rendered": rendered.HTML, "Categories": cats, "SelectedCategory": string(item.CategoryID), "CurrentArticleID": item.ID, "Neighbors": neighbors})
 }
 func (a *App) categoryMenu(w http.ResponseWriter, r *http.Request) {
 	id := domain.ID(chi.URLParam(r, "id"))
