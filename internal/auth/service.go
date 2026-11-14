@@ -111,6 +111,9 @@ func (s *Service) ChangePassword(ctx context.Context, id domain.ID, old, newPass
 		if n != 1 {
 			return domain.ErrConflict
 		}
+		if e = revokeMCPKeys(ctx, tx, id, s.now().Unix()); e != nil {
+			return e
+		}
 		_, e = tx.ExecContext(ctx, "DELETE FROM sessions WHERE user_id=?", id)
 		return e
 	})
@@ -138,6 +141,9 @@ func (s *Service) ResetPassword(ctx context.Context, admin, id domain.ID, passwo
 		if _, e = tx.ExecContext(ctx, "DELETE FROM login_limits WHERE login=(SELECT login FROM users WHERE id=?)", id); e != nil {
 			return e
 		}
+		if e = revokeMCPKeys(ctx, tx, id, s.now().Unix()); e != nil {
+			return e
+		}
 		_, e = tx.ExecContext(ctx, "DELETE FROM sessions WHERE user_id=?", id)
 		return e
 	})
@@ -160,6 +166,11 @@ func (s *Service) SetDisabled(ctx context.Context, admin, id domain.ID, disabled
 		n, _ := r.RowsAffected()
 		if n != 1 {
 			return domain.ErrNotFound
+		}
+		if disabled {
+			if e = revokeMCPKeys(ctx, tx, id, s.now().Unix()); e != nil {
+				return e
+			}
 		}
 		_, e = tx.ExecContext(ctx, "DELETE FROM sessions WHERE user_id=?", id)
 		return e

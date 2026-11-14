@@ -1,4 +1,4 @@
-.PHONY: generate test build verify test-integration test-capacity
+.PHONY: generate test build build-mcp verify test-integration test-capacity
 SQLC ?= sqlc
 
 generate:
@@ -11,6 +11,10 @@ build:
 	npm run build
 	mkdir -p bin
 	CGO_ENABLED=0 go build -trimpath -o bin/kb ./cmd/kb
+
+build-mcp:
+	mkdir -p bin
+	CGO_ENABLED=0 go build -trimpath -o bin/kb-mcp ./cmd/kb-mcp
 
 verify: generate build
 	go vet ./...

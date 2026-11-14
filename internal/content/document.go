@@ -164,14 +164,22 @@ func (r *renderer) render(n node, parent string, depth int) error {
 				text = `<span style="` + style + `">` + text + `</span>`
 				continue
 			case "link":
-				if !attrsOnly(m.Attrs, "href", "target", "rel", "class") {
+				if !attrsOnly(m.Attrs, "href", "target", "rel", "class", "title") {
 					return domain.ErrInvalid
 				}
 				href, e := str(m.Attrs, "href")
 				if e != nil || !safeLink(href) {
 					return domain.ErrInvalid
 				}
-				text = `<a href="` + html.EscapeString(href) + `" rel="noopener noreferrer">` + text + `</a>`
+				title, e := str(m.Attrs, "title")
+				if e != nil {
+					return e
+				}
+				titleAttr := ""
+				if title != "" {
+					titleAttr = ` title="` + html.EscapeString(title) + `"`
+				}
+				text = `<a href="` + html.EscapeString(href) + `" rel="noopener noreferrer"` + titleAttr + `>` + text + `</a>`
 				continue
 			default:
 				return domain.ErrInvalid

@@ -1,0 +1,46 @@
+# Place in /var/www/axentris/nginx-vhosts/wiki.conf AFTER issuing the certificate.
+# Add `include /etc/nginx/vhosts/*.conf;` inside the main nginx.conf http {}.
+# Requires Nginx >= 1.27.3. Do not also include the generic upstream/site examples.
+upstream knowledgebase_backend {
+    zone knowledgebase_backend 64k;
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    server knowledgebase-app:8080 resolve;
+    keepalive 64;
+}
+
+server {
+    listen 80;
+    server_name wiki.axentris.ru;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    server_name wiki.axentris.ru;
+
+    ssl_certificate /etc/letsencrypt/live/wiki.axentris.ru/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/wiki.axentris.ru/privkey.pem;
+
+    client_max_body_size 12m;
+
+    location / {
+        proxy_pass http://knowledgebase_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 60s;
+        proxy_send_timeout 60s;
+        # Forward MCP responses without accumulating them in the proxy.
+        proxy_buffering off;
+    }
+}

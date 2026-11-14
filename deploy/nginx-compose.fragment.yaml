@@ -3,9 +3,13 @@
 services:
   nginx:
     networks:
-      - default # Example only: keep the networks already used by your Nginx.
+      - app-network # Axentris: preserve its existing network and settings.
       - knowledgebase-ingress
+    volumes:
+      # ADD this mount to the existing SSL/log mounts; do not replace them.
+      - ./nginx-vhosts:/etc/nginx/vhosts:ro
 networks:
+  # Keep your existing app-network definition unchanged.
   knowledgebase-ingress:
     external: true
     name: knowledgebase-ingress
