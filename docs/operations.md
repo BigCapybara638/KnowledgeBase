@@ -60,9 +60,11 @@ SQLite должна находиться на локальном диске. З�
 
 ## Развёртывание в отдельной папке
 
-Соберите образ в checkout: `docker build -t knowledgebase:local .`. Если сборка выполняется на другой машине, доставьте образ через свой registry или `docker save`/`docker load`; публикация образа в сторонний registry сама не выполняется. На сервере достаточно Docker Engine с Compose, компиляторы не нужны.
+Основной production-путь — [автодеплой из GitHub Actions](deployment.md): образ собирается в CI, передаётся архивом по SSH, загружается через `docker load` и запускается в `/opt/knowledgebase` без исходников на сервере. Registry не нужен. Серверный `.env` не изменяется, тег образа сохраняется в `compose.override.yaml`. Выполняйте обычные команды обслуживания из `/opt/knowledgebase`, чтобы Compose учитывал оба файла.
 
-В отдельную `/opt/knowledgebase` скопируйте `deploy/compose.yaml` и `deploy/.env.example` как `.env`. Укажите настоящий HTTPS-домен и имя доставленного образа. Создайте `data` и `backups` с правами 0700 и владельцем 65532:65532 (обычно через sudo на хосте). Не используйте общие тома клиентских приложений.
+Для ручной установки можно собрать образ в checkout: `docker build -t knowledgebase:local .` и доставить его через registry или `docker save`/`docker load`. На сервере достаточно Docker Engine с Compose, компиляторы не нужны.
+
+Для новой ручной установки в отдельную `/opt/knowledgebase` скопируйте `deploy/compose.yaml` и `deploy/.env.example` как `.env`; существующий `.env` не перезаписывайте. Укажите настоящий HTTPS-домен; если не используете `compose.override.yaml`, добавьте `KB_IMAGE=имя:тег` доставленного образа в `.env`. Создайте `data` и `backups` с правами 0700 и владельцем 65532:65532 (обычно через sudo на хосте). Не используйте общие тома клиентских приложений.
 
 ```sh
 cd /opt/knowledgebase

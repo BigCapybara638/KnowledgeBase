@@ -1,0 +1,97 @@
+name: Verify and deploy wiki
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wiki-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Test deployment behavior
+        run: python3 -m unittest discover -s tests/deploy -v
+      - run: go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.30.0
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: make verify
+      - run: git diff --exit-code -- internal/storage/dbgen
+      - run: docker build -t knowledgebase:test .
+      - run: make test-integration
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select release tag
+        id: image
+        env:
+          COMMIT: ${{ github.sha }}
+        run: echo "reference=knowledgebase:$COMMIT" >> "$GITHUB_OUTPUT"
+      - name: Build and archive image
+        env:
+          IMAGE: ${{ steps.image.outputs.reference }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          docker build --platform linux/amd64 \
+            --label "org.opencontainers.image.source=https://github.com/$REPOSITORY" \
+            --label "org.opencontainers.image.revision=$COMMIT" \
+            --tag "$IMAGE" .
+          docker image save "$IMAGE" | gzip -1 > knowledgebase-image.tar.gz
+          sha256sum knowledgebase-image.tar.gz > knowledgebase-image.tar.gz.sha256
+      - name: Upload image and deployment files, then update wiki
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          IMAGE: ${{ steps.image.outputs.reference }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${VPS_HOST:?Set VPS_HOST}" "${VPS_USER:?Set VPS_USER}"
+          : "${VPS_SSH_KEY:?Set VPS_SSH_KEY}" "${VPS_KNOWN_HOSTS:?Set VPS_KNOWN_HOSTS}"
+          port=${VPS_PORT:-22}
+          [[ "$VPS_HOST" =~ ^[a-zA-Z0-9._-]+$ ]]
+          [[ "$VPS_USER" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]]
+          [[ "$port" =~ ^[0-9]+$ ]]
+          ssh_dir=$(mktemp -d)
+          trap 'rm -rf -- "$ssh_dir"' EXIT
+          chmod 700 "$ssh_dir"
+          printf '%s\n' "$VPS_SSH_KEY" > "$ssh_dir/key"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          chmod 600 "$ssh_dir/key" "$ssh_dir/known_hosts"
+          options=(-i "$ssh_dir/key" -o IdentitiesOnly=yes -o BatchMode=yes
+                   -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$ssh_dir/known_hosts"
+                   -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3)
+          remote="$VPS_USER@$VPS_HOST"
+          upload="/opt/knowledgebase/incoming-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          ssh "${options[@]}" -p "$port" "$remote" "mkdir -p -- '$upload'"
+          scp "${options[@]}" -P "$port" \
+            knowledgebase-image.tar.gz knowledgebase-image.tar.gz.sha256 \
+            deploy/compose.yaml deploy/deploy.sh deploy/.env.example "$remote:$upload/"
+          ssh "${options[@]}" -p "$port" "$remote" "bash '$upload/deploy.sh' /opt/knowledgebase '$IMAGE'"
+          ssh "${options[@]}" -p "$port" "$remote" \
+            "rm -- '$upload/knowledgebase-image.tar.gz' '$upload/knowledgebase-image.tar.gz.sha256' '$upload/compose.yaml' '$upload/deploy.sh' '$upload/.env.example' && rmdir -- '$upload'"
