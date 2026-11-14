@@ -15,7 +15,8 @@ test('article navigation updates sidebar, works on mobile, and returns home', as
  await expect(nav.locator('[rel="next"]')).toHaveAttribute('href', last)
  for (const colorScheme of ['light', 'dark'] as const) {
   await page.emulateMedia({colorScheme})
-  expect(await active.evaluate(el => getComputedStyle(el).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)')
+  const inactive = page.locator(`.sidebar-article[href="${first}"]`)
+  expect(await active.evaluate(el => getComputedStyle(el).color)).not.toBe(await inactive.evaluate(el => getComputedStyle(el).color))
   for (const width of [1440, 390]) {
    await page.setViewportSize({width, height:900})
    await nav.scrollIntoViewIfNeeded()
@@ -44,4 +45,21 @@ test('article navigation updates sidebar, works on mobile, and returns home', as
  await page.goto(`/?category=${category}`)
  await expect(page).toHaveURL('/')
  await expect(page.getByRole('link', {name:'Управление категориями'})).toBeVisible()
+})
+
+test('category plus creates a persistent draft in that category', async ({page}) => {
+ await login(page, 'reader')
+ await page.setViewportSize({width:390, height:900})
+ const category = page.locator('.category-group').first()
+ const categoryID = (await category.locator('summary').getAttribute('hx-get'))!.split('/')[2]
+ await category.getByRole('button', {name:'Добавить статью в категорию «Инструкции»', exact:true}).click()
+ await expect(page.getByRole('combobox', {name:'Категория', exact:true})).toHaveValue(categoryID)
+ await page.reload()
+ await expect(page.getByRole('combobox', {name:'Категория', exact:true})).toHaveValue(categoryID)
+ await page.getByLabel('Название статьи').fill('Статья через плюс категории')
+ await page.locator('.tiptap').fill('Создана в выбранной категории')
+ await page.getByRole('button', {name:'Опубликовать', exact:true}).click()
+ await expect(page).toHaveURL(/\/articles\//)
+ await expect(page.locator('article > .category-badge')).toHaveText('Инструкции')
+ await expect(page.locator('.sidebar-article[aria-current="page"]')).toHaveText('Статья через плюс категории')
 })

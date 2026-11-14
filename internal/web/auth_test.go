@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 )
 
 func authFixture(t *testing.T) (*App, *auth.Service, domain.User) {
@@ -58,6 +59,31 @@ func TestRejectsExternalReturnTo(t *testing.T) {
 			t.Fatalf("unsafe redirect %q: %d %q", ret, w.Code, w.Header().Get("Location"))
 		}
 	}
+}
+func TestLoginCookieLastsOneWeek(t *testing.T) {
+	h, _, u := authFixture(t)
+	before := time.Now().Truncate(time.Second)
+	w := loginRequest(t, h, u, "/", "https://kb.test")
+	after := time.Now().Truncate(time.Second)
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("login failed: %d", w.Code)
+	}
+	for _, c := range w.Result().Cookies() {
+		if c.Name != "kb_session" {
+			continue
+		}
+		if c.MaxAge != 604800 {
+			t.Fatalf("cookie MaxAge = %d, want 604800 seconds", c.MaxAge)
+		}
+		if c.Expires.Before(before.Add(7*24*time.Hour)) || c.Expires.After(after.Add(7*24*time.Hour)) {
+			t.Fatalf("cookie expiry is not one week after login: %v", c.Expires)
+		}
+		if !c.HttpOnly || !c.Secure || c.SameSite != http.SameSiteLaxMode || c.Path != "/" {
+			t.Fatalf("session cookie lost security attributes: %+v", c)
+		}
+		return
+	}
+	t.Fatal("login did not set session cookie")
 }
 func TestUnsafeRequestsRequireCSRF(t *testing.T) {
 	h, _, _ := authFixture(t)

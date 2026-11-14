@@ -24,7 +24,13 @@ func (a *App) createDraft(w http.ResponseWriter, r *http.Request) {
 		id := domain.ID(raw)
 		articleID = &id
 	}
-	d, e := a.articles.CreateDraft(r.Context(), currentUser(r).ID, articleID)
+	var d domain.Draft
+	var e error
+	if articleID == nil {
+		d, e = a.articles.CreateDraftInCategory(r.Context(), currentUser(r).ID, domain.ID(r.FormValue("category_id")))
+	} else {
+		d, e = a.articles.CreateDraft(r.Context(), currentUser(r).ID, articleID)
+	}
 	if e != nil {
 		a.fail(w, r, e)
 		return

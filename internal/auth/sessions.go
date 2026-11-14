@@ -14,6 +14,9 @@ import (
 	"time"
 )
 
+// SessionLifetime is the absolute validity period from login, without renewal on requests.
+const SessionLifetime = 7 * 24 * time.Hour
+
 func tokenHash(token string) string {
 	h := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(h[:])
@@ -80,7 +83,7 @@ func (s *Service) Login(ctx context.Context, login, password string) (LoginResul
 		if _, e := tx.ExecContext(ctx, "DELETE FROM login_limits WHERE login=?", login); e != nil {
 			return e
 		}
-		_, e := tx.ExecContext(ctx, "INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)", tokenHash(token), id, now+int64(12*time.Hour/time.Second))
+		_, e := tx.ExecContext(ctx, "INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)", tokenHash(token), id, now+int64(SessionLifetime/time.Second))
 		return e
 	})
 	return LoginResult{RawToken: token, MustChangePassword: mustChange}, e

@@ -58,6 +58,12 @@ func (s *Service) Drafts(ctx context.Context, actor domain.ID) ([]domain.Draft, 
 	return out, rows.Err()
 }
 func (s *Service) CreateDraft(ctx context.Context, actor domain.ID, articleID *domain.ID) (domain.Draft, error) {
+	return s.createDraft(ctx, actor, articleID, "")
+}
+func (s *Service) CreateDraftInCategory(ctx context.Context, actor, categoryID domain.ID) (domain.Draft, error) {
+	return s.createDraft(ctx, actor, nil, categoryID)
+}
+func (s *Service) createDraft(ctx context.Context, actor domain.ID, articleID *domain.ID, categoryID domain.ID) (domain.Draft, error) {
 	if _, e := s.store.Editor(ctx, actor); e != nil {
 		return domain.Draft{}, e
 	}
@@ -67,6 +73,16 @@ func (s *Service) CreateDraft(ctx context.Context, actor domain.ID, articleID *d
 			return e
 		}
 		if articleID == nil {
+			if categoryID != "" {
+				var count int
+				if e := tx.QueryRowContext(ctx, "SELECT count(*) FROM categories WHERE id=?", categoryID).Scan(&count); e != nil {
+					return e
+				}
+				if count != 1 {
+					return domain.ErrInvalid
+				}
+				d.CategoryID = categoryID
+			}
 			if _, e := tx.ExecContext(ctx, "INSERT INTO articles(id,author_id) VALUES(?,?)", d.ArticleID, actor); e != nil {
 				return e
 			}
