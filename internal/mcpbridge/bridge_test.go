@@ -1,11 +1,14 @@
 package mcpbridge_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -173,3 +176,65 @@ type discardWriter struct{}
 
 func (discardWriter) Write(p []byte) (int, error) { return len(p), nil }
 func (discardWriter) Close() error                { return nil }
+
+func TestBridgeUnknownCreateOutcomeDoesNotEncourageBlindRetry(t *testing.T) {
+	var saved atomic.Int32
+	server := mcp.NewServer(&mcp.Implementation{Name: "remote", Version: "1.1.0"}, nil)
+	mcp.AddTool(server, &mcp.Tool{Name: "create_article"}, func(_ context.Context, _ *mcp.CallToolRequest, in struct{}) (*mcp.CallToolResult, struct {
+		DraftID string `json:"draft_id"`
+	}, error) { saved.Add(1); return nil, struct {
+		DraftID string `json:"draft_id"`
+	}{"saved-draft"}, nil })
+	transport := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server }, &mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "bad request", 400)
+			return
+		}
+		r.Body = io.NopCloser(bytes.NewReader(body))
+		var message struct {
+			Method string `json:"method"`
+			Params struct {
+				Name string `json:"name"`
+			} `json:"params"`
+		}
+		if json.Unmarshal(body, &message) == nil && message.Method == "tools/call" && message.Params.Name == "create_article" {
+			// Complete the write, then lose the response before it reaches the client.
+			transport.ServeHTTP(httptest.NewRecorder(), r)
+			conn, _, err := w.(http.Hijacker).Hijack()
+			if err == nil {
+				conn.Close()
+			}
+			return
+		}
+		transport.ServeHTTP(w, r)
+	}))
+	defer srv.Close()
+	inputR, inputW := io.Pipe()
+	outputR, outputW := io.Pipe()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- mcpbridge.Run(ctx, srv.URL, testKey, inputR, outputW) }()
+	client := mcp.NewClient(&mcp.Implementation{Name: "local", Version: "1.0.0"}, nil)
+	session, err := client.Connect(ctx, &mcp.IOTransport{Reader: outputR, Writer: inputW}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "create_article", Arguments: map[string]any{}})
+	if err != nil || !result.IsError || saved.Load() != 1 {
+		t.Fatalf("ambiguous write setup: saved=%d err=%v", saved.Load(), err)
+	}
+	text := result.Content[0].(*mcp.TextContent).Text
+	if !strings.Contains(text, "Мои черновики") || strings.Contains(text, "повторите запрос") {
+		t.Fatalf("unsafe write guidance: %s", text)
+	}
+	session.Close()
+	select {
+	case <-done:
+	case <-ctx.Done():
+		t.Fatal("bridge did not stop")
+	}
+}

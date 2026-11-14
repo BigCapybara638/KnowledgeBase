@@ -33,7 +33,16 @@ func (a *App) createMCPToken(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	_, raw, err := a.accounts.CreateMCPToken(r.Context(), currentUser(r).ID, r.FormValue("name"), days)
+	canWrite := false
+	if value := r.FormValue("can_write"); value != "" {
+		var err error
+		canWrite, err = strconv.ParseBool(value)
+		if err != nil {
+			a.renderMCPTokens(w, r, 400, "", "Выберите права ключа.")
+			return
+		}
+	}
+	_, raw, err := a.accounts.CreateMCPTokenWithWrite(r.Context(), currentUser(r).ID, r.FormValue("name"), days, canWrite)
 	if errors.Is(err, domain.ErrInvalid) {
 		a.renderMCPTokens(w, r, 400, "", "Укажите название от 1 до 80 символов и срок 30, 90 или 365 дней.")
 		return
@@ -51,6 +60,19 @@ func (a *App) createMCPToken(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) revokeMCPToken(w http.ResponseWriter, r *http.Request) {
 	if err := a.accounts.RevokeMCPToken(r.Context(), currentUser(r).ID, domain.ID(chi.URLParam(r, "id"))); err != nil {
+		a.fail(w, r, err)
+		return
+	}
+	http.Redirect(w, r, "/settings/mcp", http.StatusSeeOther)
+}
+
+func (a *App) setMCPTokenPermissions(w http.ResponseWriter, r *http.Request) {
+	allowed, err := strconv.ParseBool(r.FormValue("can_write"))
+	if err != nil {
+		a.renderMCPTokens(w, r, 400, "", "Выберите права ключа.")
+		return
+	}
+	if err = a.accounts.SetMCPTokenWrite(r.Context(), currentUser(r).ID, domain.ID(chi.URLParam(r, "id")), allowed); err != nil {
 		a.fail(w, r, err)
 		return
 	}

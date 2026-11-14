@@ -68,6 +68,7 @@ func New(cfg config.Config, s *storage.Store, accounts *auth.Service) (*App, err
 		p.Get("/settings/mcp", a.mcpTokensPage)
 		p.Post("/settings/mcp", a.createMCPToken)
 		p.Post("/settings/mcp/{id}/revoke", a.revokeMCPToken)
+		p.Post("/settings/mcp/{id}/permissions", a.setMCPTokenPermissions)
 		p.Get("/articles/{id}", a.article)
 		p.Get("/drafts", a.draftsPage)
 		p.Post("/drafts", a.createDraft)

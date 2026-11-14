@@ -71,6 +71,7 @@ type McpToken struct {
 	CreatedAt int64  `json:"created_at"`
 	ExpiresAt int64  `json:"expires_at"`
 	RevokedAt int64  `json:"revoked_at"`
+	CanWrite  int64  `json:"can_write"`
 }
 
 type Medium struct {
