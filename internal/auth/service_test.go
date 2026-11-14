@@ -75,6 +75,32 @@ func TestNormalRestartKeepsSession(t *testing.T) {
 		t.Fatal("logout token still valid")
 	}
 }
+func TestSessionValidForOneWeek(t *testing.T) {
+	a, admin := fixture(t)
+	ctx := context.Background()
+	started := time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC)
+	clock := started
+	a.Config.Now = func() time.Time { return clock }
+	u, e := a.Store.User(ctx, admin)
+	if e != nil {
+		t.Fatal(e)
+	}
+	l, e := a.Login(ctx, u.Login, testutil.Password)
+	if e != nil {
+		t.Fatal(e)
+	}
+	for _, elapsed := range []time.Duration{13 * time.Hour, 7*24*time.Hour - time.Second} {
+		clock = started.Add(elapsed)
+		got, e := a.ResolveSession(ctx, l.RawToken)
+		if e != nil || got.ID != admin {
+			t.Fatalf("session invalid after %v: user=%v err=%v", elapsed, got.ID, e)
+		}
+	}
+	clock = started.Add(7 * 24 * time.Hour)
+	if _, e := a.ResolveSession(ctx, l.RawToken); !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("session must expire after one week: %v", e)
+	}
+}
 func TestDisableAndResetRevokeSessions(t *testing.T) {
 	a, admin := fixture(t)
 	id := testutil.User(t, a.Store, "user")

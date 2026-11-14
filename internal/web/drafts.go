@@ -24,12 +24,30 @@ func (a *App) createDraft(w http.ResponseWriter, r *http.Request) {
 		id := domain.ID(raw)
 		articleID = &id
 	}
-	d, e := a.articles.CreateDraft(r.Context(), currentUser(r).ID, articleID)
+	var d domain.Draft
+	var e error
+	if articleID == nil {
+		d, e = a.articles.CreateDraftInCategory(r.Context(), currentUser(r).ID, domain.ID(r.FormValue("category_id")))
+	} else {
+		d, e = a.articles.CreateDraft(r.Context(), currentUser(r).ID, articleID)
+	}
 	if e != nil {
 		a.fail(w, r, e)
 		return
 	}
 	http.Redirect(w, r, "/drafts/"+string(d.ID)+"/edit", 303)
+}
+func (a *App) deleteDraft(w http.ResponseWriter, r *http.Request) {
+	version, e := strconv.ParseInt(r.FormValue("version"), 10, 64)
+	if e != nil || version < 1 {
+		a.fail(w, r, domain.ErrInvalid)
+		return
+	}
+	if e = a.articles.DeleteDraft(r.Context(), currentUser(r).ID, domain.ID(chi.URLParam(r, "id")), domain.Version(version)); e != nil {
+		a.fail(w, r, e)
+		return
+	}
+	http.Redirect(w, r, "/drafts", http.StatusSeeOther)
 }
 func (a *App) editor(w http.ResponseWriter, r *http.Request) {
 	d, e := a.articles.GetDraft(r.Context(), currentUser(r).ID, domain.ID(chi.URLParam(r, "id")))

@@ -81,14 +81,14 @@ func TestCategoryFilterAndStablePagination(t *testing.T) {
 func TestSidebarPagesBy50(t *testing.T) {
 	s, u, c := seed(t, 55)
 	a := articles.New(s)
-	p, e := a.ListCategoryMenu(context.Background(), u, c, "")
+	p, e := a.ListCategoryMenu(context.Background(), u, c, "", "")
 	if e != nil {
 		t.Fatal(e)
 	}
 	if len(p.Items) != 50 || p.Next == "" {
 		t.Fatal(p)
 	}
-	next, e := a.ListCategoryMenu(context.Background(), u, c, p.Next)
+	next, e := a.ListCategoryMenu(context.Background(), u, c, p.Next, "")
 	if e != nil || len(next.Items) != 5 || next.Next != "" {
 		t.Fatal(next, e)
 	}

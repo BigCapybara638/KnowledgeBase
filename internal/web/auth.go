@@ -13,7 +13,7 @@ func (a *App) loginPage(w http.ResponseWriter, r *http.Request) {
 	a.view(w, r, 200, "login.html", map[string]any{"Title": "Вход", "ReturnTo": safeReturnTo(r.URL.Query().Get("return_to"))})
 }
 func (a *App) setSession(w http.ResponseWriter, token string) {
-	http.SetCookie(w, &http.Cookie{Name: "kb_session", Value: token, Path: "/", HttpOnly: true, Secure: !a.cfg.Dev, SameSite: http.SameSiteLaxMode, MaxAge: 43200, Expires: time.Now().Add(12 * time.Hour)})
+	http.SetCookie(w, &http.Cookie{Name: "kb_session", Value: token, Path: "/", HttpOnly: true, Secure: !a.cfg.Dev, SameSite: http.SameSiteLaxMode, MaxAge: int(auth.SessionLifetime / time.Second), Expires: time.Now().Add(auth.SessionLifetime)})
 }
 func (a *App) login(w http.ResponseWriter, r *http.Request) {
 	l, e := a.accounts.Login(r.Context(), r.FormValue("login"), r.FormValue("password"))

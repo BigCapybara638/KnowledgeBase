@@ -58,6 +58,12 @@ func (s *Service) Drafts(ctx context.Context, actor domain.ID) ([]domain.Draft, 
 	return out, rows.Err()
 }
 func (s *Service) CreateDraft(ctx context.Context, actor domain.ID, articleID *domain.ID) (domain.Draft, error) {
+	return s.createDraft(ctx, actor, articleID, "")
+}
+func (s *Service) CreateDraftInCategory(ctx context.Context, actor, categoryID domain.ID) (domain.Draft, error) {
+	return s.createDraft(ctx, actor, nil, categoryID)
+}
+func (s *Service) createDraft(ctx context.Context, actor domain.ID, articleID *domain.ID, categoryID domain.ID) (domain.Draft, error) {
 	if _, e := s.store.Editor(ctx, actor); e != nil {
 		return domain.Draft{}, e
 	}
@@ -67,6 +73,16 @@ func (s *Service) CreateDraft(ctx context.Context, actor domain.ID, articleID *d
 			return e
 		}
 		if articleID == nil {
+			if categoryID != "" {
+				var count int
+				if e := tx.QueryRowContext(ctx, "SELECT count(*) FROM categories WHERE id=?", categoryID).Scan(&count); e != nil {
+					return e
+				}
+				if count != 1 {
+					return domain.ErrInvalid
+				}
+				d.CategoryID = categoryID
+			}
 			if _, e := tx.ExecContext(ctx, "INSERT INTO articles(id,author_id) VALUES(?,?)", d.ArticleID, actor); e != nil {
 				return e
 			}
@@ -150,6 +166,39 @@ func (s *Service) SaveDraft(ctx context.Context, in SaveDraftInput) (domain.Draf
 	}
 	return saved, nil
 }
+
+func (s *Service) DeleteDraft(ctx context.Context, actor, id domain.ID, expected domain.Version) error {
+	if _, e := s.store.Editor(ctx, actor); e != nil {
+		return e
+	}
+	return s.store.WithWrite(ctx, func(tx *sql.Tx) error {
+		if e := storage.AssertActor(ctx, tx, actor, false); e != nil {
+			return e
+		}
+		d, e := scanDraft(tx.QueryRowContext(ctx, draftSelect+"WHERE id=? AND owner_id=?", id, actor))
+		if e != nil {
+			return e
+		}
+		if d.Version != expected {
+			return domain.ErrConflict
+		}
+		// Foreign keys remove only this draft's media references.
+		r, e := tx.ExecContext(ctx, "DELETE FROM drafts WHERE id=? AND owner_id=? AND version=?", id, actor, expected)
+		if e != nil {
+			return e
+		}
+		n, e := r.RowsAffected()
+		if e != nil {
+			return e
+		}
+		if n != 1 {
+			return domain.ErrConflict
+		}
+		_, e = tx.ExecContext(ctx, "DELETE FROM articles WHERE id=? AND published_at IS NULL AND NOT EXISTS(SELECT 1 FROM drafts WHERE article_id=articles.id)", d.ArticleID)
+		return e
+	})
+}
+
 func syncDraftMedia(ctx context.Context, tx *sql.Tx, actor, draft domain.ID, ids []domain.ID) error {
 	for _, id := range ids {
 		var n int

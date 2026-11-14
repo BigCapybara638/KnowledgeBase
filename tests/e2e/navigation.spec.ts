@@ -1,0 +1,65 @@
+import {test, expect} from '@playwright/test'
+import {login, createArticle} from './helpers'
+
+test('article navigation updates sidebar, works on mobile, and returns home', async ({page}) => {
+ await login(page)
+ const first = await createArticle(page, '000 Navigation A', 'Первая статья')
+ const middle = await createArticle(page, '000 Navigation B', 'Средняя статья')
+ const last = await createArticle(page, '000 Navigation C', 'Последняя статья')
+ await page.goto(middle)
+ const active = page.locator('.sidebar-article[aria-current="page"]')
+ await expect(active).toHaveCount(1)
+ await expect(active).toHaveAttribute('href', middle)
+ const nav = page.getByRole('navigation', {name:'Навигация по статьям'})
+ await expect(nav.locator('[rel="prev"]')).toHaveAttribute('href', first)
+ await expect(nav.locator('[rel="next"]')).toHaveAttribute('href', last)
+ for (const colorScheme of ['light', 'dark'] as const) {
+  await page.emulateMedia({colorScheme})
+  const inactive = page.locator(`.sidebar-article[href="${first}"]`)
+  expect(await active.evaluate(el => getComputedStyle(el).color)).not.toBe(await inactive.evaluate(el => getComputedStyle(el).color))
+  for (const width of [1440, 390]) {
+   await page.setViewportSize({width, height:900})
+   await nav.scrollIntoViewIfNeeded()
+   await expect(nav.locator('[rel="prev"]')).toBeVisible()
+   await expect(nav.locator('[rel="next"]')).toBeVisible()
+   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+   const article = await page.locator('main article').boundingBox()
+   const navigation = await nav.boundingBox()
+   expect(navigation!.y).toBeGreaterThanOrEqual(article!.y + article!.height)
+   await page.screenshot({path:`.validation/navigation-${colorScheme}-${width}.png`, fullPage:true})
+  }
+ }
+ await nav.locator('[rel="next"]').click()
+ await expect(page).toHaveURL(new RegExp(last + '$'))
+ await expect(active).toHaveAttribute('href', last)
+ await page.locator('[rel="prev"]').click()
+ await expect(page).toHaveURL(new RegExp(middle + '$'))
+ await expect(active).toHaveAttribute('href', middle)
+ await page.locator('.article-actions > a').click()
+ await expect(page).toHaveURL('/')
+ await expect(page.getByRole('heading', {name:'Статьи', exact:true})).toBeVisible()
+ await expect(page.locator('.sidebar-article[aria-current="page"]')).toHaveCount(0)
+ await expect(page.locator('a[href*="?category="]')).toHaveCount(0)
+ const menuURL = await page.locator('.category-group summary').first().getAttribute('hx-get')
+ const category = menuURL!.split('/')[2]
+ await page.goto(`/?category=${category}`)
+ await expect(page).toHaveURL('/')
+ await expect(page.getByRole('link', {name:'Управление категориями'})).toBeVisible()
+})
+
+test('category plus creates a persistent draft in that category', async ({page}) => {
+ await login(page, 'reader')
+ await page.setViewportSize({width:390, height:900})
+ const category = page.locator('.category-group').first()
+ const categoryID = (await category.locator('summary').getAttribute('hx-get'))!.split('/')[2]
+ await category.getByRole('button', {name:'Добавить статью в категорию «Инструкции»', exact:true}).click()
+ await expect(page.getByRole('combobox', {name:'Категория', exact:true})).toHaveValue(categoryID)
+ await page.reload()
+ await expect(page.getByRole('combobox', {name:'Категория', exact:true})).toHaveValue(categoryID)
+ await page.getByLabel('Название статьи').fill('Статья через плюс категории')
+ await page.locator('.tiptap').fill('Создана в выбранной категории')
+ await page.getByRole('button', {name:'Опубликовать', exact:true}).click()
+ await expect(page).toHaveURL(/\/articles\//)
+ await expect(page.locator('article > .category-badge')).toHaveText('Инструкции')
+ await expect(page.locator('.sidebar-article[aria-current="page"]')).toHaveText('Статья через плюс категории')
+})
