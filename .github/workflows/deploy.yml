@@ -66,13 +66,12 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
-          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
           IMAGE: ${{ steps.image.outputs.reference }}
         shell: bash
         run: |
           set -euo pipefail
           : "${VPS_HOST:?Set VPS_HOST}" "${VPS_USER:?Set VPS_USER}"
-          : "${VPS_SSH_KEY:?Set VPS_SSH_KEY}" "${VPS_KNOWN_HOSTS:?Set VPS_KNOWN_HOSTS}"
+          : "${VPS_SSH_KEY:?Set VPS_SSH_KEY}"
           port=${VPS_PORT:-22}
           [[ "$VPS_HOST" =~ ^[a-zA-Z0-9._-]+$ ]]
           [[ "$VPS_USER" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]]
@@ -81,10 +80,9 @@ jobs:
           trap 'rm -rf -- "$ssh_dir"' EXIT
           chmod 700 "$ssh_dir"
           printf '%s\n' "$VPS_SSH_KEY" > "$ssh_dir/key"
-          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
-          chmod 600 "$ssh_dir/key" "$ssh_dir/known_hosts"
+          chmod 600 "$ssh_dir/key"
           options=(-i "$ssh_dir/key" -o IdentitiesOnly=yes -o BatchMode=yes
-                   -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$ssh_dir/known_hosts"
+                   -o StrictHostKeyChecking=accept-new -o "UserKnownHostsFile=$ssh_dir/known_hosts"
                    -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3)
           remote="$VPS_USER@$VPS_HOST"
           upload="/opt/knowledgebase/incoming-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"

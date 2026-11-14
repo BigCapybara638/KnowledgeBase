@@ -4,7 +4,7 @@
 
 **Goal:** Replace the old Actions workflow with tested Docker-archive-to-VPS deployment on push to main, preserving the server's `.env` and persistent data.
 
-**Architecture:** Actions verifies the project, builds a commit-tagged Linux amd64 image, saves it as a gzip archive, and uploads the archive, checksum and deployment files over verified SSH. A Bash script validates the checksum, loads the image, and backs up the current service before installing the new Compose configuration and image override; `.env` is never written. Nginx remains in the Axentris project and routes wiki.axentris.ru through an external Docker network.
+**Architecture:** Actions verifies the project, builds a commit-tagged Linux amd64 image, saves it as a gzip archive, and uploads the archive, checksum and deployment files over SSH. A Bash script validates the checksum, loads the image, and backs up the current service before installing the new Compose configuration and image override; `.env` is never written. Nginx remains in the Axentris project and routes wiki.axentris.ru through an external Docker network.
 
 **Tech Stack:** GitHub Actions, OpenSSH, Bash, gzip/SHA-256, Docker Compose v2.20+, existing Go application and SQLite. No image registry.
 
@@ -19,7 +19,7 @@
 - A `.bootstrap-required` marker persists across interrupted/failed bootstrap attempts, even when SQLite has already been initialized.
 - Updates require a successful backup before replacing the current configuration; failures must fail Actions.
 - Do not automatically downgrade an image after possible SQLite migrations.
-- Deploy only main pushes; PRs run verification only. Verify SSH host keys.
+- Deploy only main pushes; PRs run verification only. Per explicit user preference, accept the SSH host key on first connection of each run and reuse it for subsequent SSH/SCP calls in that run; no host-key secret is required.
 
 ## Review Focus
 

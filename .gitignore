@@ -5,6 +5,9 @@ bin/
 test-results/
 playwright-report/
 .env
+.env.txt
+*.yaml.txt
+*.yml.txt
 /data/
 /backups/
 *.log
