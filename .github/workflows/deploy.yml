@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -36,7 +37,7 @@ jobs:
       - run: make test-integration
 
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -85,11 +86,11 @@ jobs:
                    -o StrictHostKeyChecking=accept-new -o "UserKnownHostsFile=$ssh_dir/known_hosts"
                    -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3)
           remote="$VPS_USER@$VPS_HOST"
-          upload="/opt/knowledgebase/incoming-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          upload="/var/www/knowledgebase/incoming-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           ssh "${options[@]}" -p "$port" "$remote" "mkdir -p -- '$upload'"
           scp "${options[@]}" -P "$port" \
             knowledgebase-image.tar.gz knowledgebase-image.tar.gz.sha256 \
             deploy/compose.yaml deploy/deploy.sh deploy/.env.example "$remote:$upload/"
-          ssh "${options[@]}" -p "$port" "$remote" "bash '$upload/deploy.sh' /opt/knowledgebase '$IMAGE'"
+          ssh "${options[@]}" -p "$port" "$remote" "bash '$upload/deploy.sh' /var/www/knowledgebase '$IMAGE' /var/www/axentris_core"
           ssh "${options[@]}" -p "$port" "$remote" \
             "rm -- '$upload/knowledgebase-image.tar.gz' '$upload/knowledgebase-image.tar.gz.sha256' '$upload/compose.yaml' '$upload/deploy.sh' '$upload/.env.example' && rmdir -- '$upload'"

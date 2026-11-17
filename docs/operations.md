@@ -25,20 +25,20 @@ docker compose exec -T knowledgebase-app /app/kb backup
 Пример ежедневного cron на хосте (путь поправьте под установку):
 
 ```cron
-0 2 * * * cd /opt/knowledgebase && docker compose exec -T knowledgebase-app /app/kb backup >>/var/log/knowledgebase-backup.log 2>&1
-30 2 * * * cd /opt/knowledgebase && docker compose exec -T knowledgebase-app /app/kb maintenance >>/var/log/knowledgebase-maintenance.log 2>&1
+0 2 * * * cd /var/www/axentris_core && docker compose exec -T knowledgebase-app /app/kb backup >>/var/log/knowledgebase-backup.log 2>&1
+30 2 * * * cd /var/www/axentris_core && docker compose exec -T knowledgebase-app /app/kb maintenance >>/var/log/knowledgebase-maintenance.log 2>&1
 ```
 
 Время задаётся часовым поясом cron хоста. Настройте доставку ошибок и перенос завершённых комплектов на независимый носитель/сервер: том на том же диске не защищает от его поломки. Периодически проверяйте restore.
 
 ## Восстановление
 
-Остановите только базу знаний. Сохраните старый каталог данных переименованием/архивом; подготовьте новый пустой `data` с владельцем UID/GID 65532. Не удаляйте старые данные, пока не проверили восстановление.
+Остановите только базу знаний. Сохраните `/var/www/knowledgebase/data` переименованием/архивом; подготовьте новый пустой каталог по тому же пути с владельцем `65532:deploy` и правами `2750`. Не удаляйте старые данные, пока не проверили восстановление. Каталог `/var/www/axentris_core/data` содержит сертификаты и логи общего nginx и к восстановлению SQLite не относится.
 
 ```sh
 docker compose stop knowledgebase-app
-# Сохраните существующий ./data вне нового каталога восстановления.
-# Подготовьте новый пустой ./data и установите владельца 65532:65532.
+# Под root сохраните /var/www/knowledgebase/data вне каталога восстановления.
+# Создайте пустой /var/www/knowledgebase/data с владельцем 65532:deploy и правами 2750.
 docker compose run --rm --no-deps knowledgebase-app restore --from /backups/ИМЯ_КОМПЛЕКТА --target /data
 docker compose up -d knowledgebase-app
 docker compose exec -T knowledgebase-app /app/kb check
@@ -58,45 +58,11 @@ SQLite должна находиться на локальном диске. З�
 
 При обновлении сначала сделайте backup. Миграции применяются автоматически до готовности HTTP; откат образа после изменения схемы требует совместимости или восстановления копии. Клиентские Compose-проекты не останавливаются.
 
-## Развёртывание в отдельной папке
+## Развёртывание на VPS
 
-Основной production-путь — [автодеплой из GitHub Actions](deployment.md): образ собирается в CI, передаётся архивом по SSH, загружается через `docker load` и запускается в `/opt/knowledgebase` без исходников на сервере. Registry не нужен. Серверный `.env` не изменяется, тег образа сохраняется в `compose.override.yaml`. Выполняйте обычные команды обслуживания из `/opt/knowledgebase`, чтобы Compose учитывал оба файла.
+Production: [автодеплой из GitHub Actions](deployment.md) в `/var/www/knowledgebase`, управление контейнерами через `/var/www/axentris_core`. Все команды `docker compose` из этой инструкции на VPS выполняйте из каталога core. Его общий nginx обслуживает `wiki.axentris.ru`; сертификаты выпускает и продлевает общий Certbot.
 
-Для ручной установки можно собрать образ в checkout: `docker build -t knowledgebase:local .` и доставить его через registry или `docker save`/`docker load`. На сервере достаточно Docker Engine с Compose, компиляторы не нужны.
-
-Для новой ручной установки в отдельную `/opt/knowledgebase` скопируйте `deploy/compose.yaml` и `deploy/.env.example` как `.env`; существующий `.env` не перезаписывайте. Укажите настоящий HTTPS-домен; если не используете `compose.override.yaml`, добавьте `KB_IMAGE=имя:тег` доставленного образа в `.env`. Создайте `data` и `backups` с правами 0700 и владельцем 65532:65532 (обычно через sudo на хосте). Не используйте общие тома клиентских приложений.
-
-```sh
-cd /opt/knowledgebase
-docker network create knowledgebase-ingress
-docker compose config --quiet
-```
-
-Если сеть уже существует, сначала проверьте её назначение, а не пересоздавайте её. Имена сетей в обоих проектах должны совпадать. Не запускайте `docker system prune` или `compose down` клиентского проекта.
-
-Bootstrap без сохранения пароля в истории (Bash, терминал оператора):
-
-```bash
-read -r -s -p 'Временный пароль администратора: ' kb_bootstrap_password
-printf '\n'
-printf '%s\n' "$kb_bootstrap_password" | docker compose run --rm --no-deps -T knowledgebase-app admin create --login admin --name 'Администратор' --password-stdin
-unset kb_bootstrap_password
-docker compose up -d
-docker compose exec -T knowledgebase-app /app/kb check
-```
-
-После первого входа смените пароль, создайте категории и учётные записи сотрудников. Публичной регистрации и демонстрационных пользователей нет.
-
-## Nginx из другого Compose-проекта
-
-База не публикует порты хоста. Только текущий Nginx владеет 80/443. Сервис специально называется `knowledgebase-app`, а не `app`, чтобы при подключении новой сети к Nginx не добавить конфликтующий DNS-алиас для существующего клиентского сервиса `app`.
-
-1. В **исходном** Compose Nginx сохраните все прежние сети и добавьте внешнюю `knowledgebase-ingress`. Пример — `deploy/nginx-compose.fragment.yaml`; замените имя сервиса и список прежних сетей фактическими, не копируйте фрагмент поверх всего файла.
-2. Подключите работающий контейнер Nginx к сети командой `docker network connect knowledgebase-ingress ФАКТИЧЕСКИЙ_ID_NGINX`. Это не требует перезапуска. Сохранённое изменение Compose нужно для последующих пересозданий. Альтернатива — в его папке `docker compose up -d --no-deps ИМЯ_СЕРВИСА_NGINX` с коротким согласованным перерывом входящего трафика. Обычный reload сети не добавляет.
-3. Проверьте `nginx -v`: конфигурация требует Nginx **1.27.3 или новее** (тестируется на 1.28). Подключите `deploy/nginx-upstream.conf.example` в контексте `http {}`, вне `server {}`. Он задаёт динамическое DNS-разрешение и пул keepalive: без пула постоянный поток запросов исчерпывает исходящие порты. Затем создайте **новый** виртуальный хост `server_name kb.ваша-компания...` с сертификатом вашим обычным способом. Внутри него разместите содержимое `deploy/nginx-site.conf.example` либо подключите его как include. Не меняйте `location /` существующего клиентского домена. Файл примера — location-фрагмент, самостоятельно он не является полным конфигом Nginx.
-4. Проверьте конфигурацию через `docker exec ФАКТИЧЕСКИЙ_ID_NGINX nginx -t`, затем `docker exec ФАКТИЧЕСКИЙ_ID_NGINX nginx -s reload`.
-
-Nginx обращается к `knowledgebase-app:8080`, не к `localhost`. DNS разрешается заново через Docker resolver; после смены IP при обновлении приложения маршрут восстанавливается в пределах TTL 10 секунд плюс старт сервиса. На этом промежутке допустимы короткие 502. Внешняя сеть не удаляется при остановке одного из проектов.
+Начальная настройка каталогов, прав и администратора, а также порядок подключения Compose описаны в [deployment.md](deployment.md). Контейнер Knowledgebase принадлежит профилю `knowledgebase`: для запуска всей сборки используйте `docker compose --profile knowledgebase up -d`, для отдельного приложения — `docker compose up -d knowledgebase-app`. Отдельный Compose-проект для production не запускайте.
 
 ## Ресурсы и диагностика
 

@@ -6,3 +6,8 @@ services:
 volumes:
   kb-data:
   kb-backups:
+networks:
+  # The integration harness deliberately runs ingress as a separate project.
+  knowledgebase-web: !override
+    external: true
+    name: ${KB_NETWORK_NAME}

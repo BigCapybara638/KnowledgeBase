@@ -22,10 +22,13 @@ class DeploymentTests(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
         self.server = self.root / "server"
+        self.core = self.root / "axentris_core"
         self.stage = self.root / "incoming"
         self.commands = self.root / "commands"
-        for directory in (self.server, self.stage, self.commands):
+        for directory in (self.server, self.core, self.stage, self.commands):
             directory.mkdir()
+        (self.core / "docker-compose.yml").write_text("core compose\n")
+        (self.core / ".env").write_text("LETSENCRYPT_EMAIL=admin@example.com\n")
         for name in ("data", "backups"):
             (self.server / name).mkdir()
         for name in ("deploy.sh", "compose.yaml", ".env.example"):
@@ -43,14 +46,14 @@ class DeploymentTests(unittest.TestCase):
         docker = self.commands / "docker"
         docker.write_text("""#!/usr/bin/env bash
 set -eu
-printf '%s\\n' "$*" >> "$DEPLOY_TEST_LOG"
+printf '%s | %s\\n' "$PWD" "$*" >> "$DEPLOY_TEST_LOG"
 case "$*" in
   'image load --input '*) [ "${DEPLOY_TEST_FAILURE:-}" != load ] ;;
   'image inspect '*) [ "${DEPLOY_TEST_FAILURE:-}" != inspect ] ;;
   *'ps --status running -q knowledgebase-app')
     if [ "${DEPLOY_TEST_STOPPED:-}" != yes ]; then printf 'container-id\\n'; fi ;;
   *'backup')
-    cat compose.override.yaml > "$DEPLOY_TEST_BACKUP_IMAGE"
+    cat "$DEPLOY_TEST_PROJECT/docker-compose.override.yml" > "$DEPLOY_TEST_BACKUP_IMAGE"
     [ "${DEPLOY_TEST_FAILURE:-}" != backup ] ;;
   *'up -d --no-deps --wait --wait-timeout 120 knowledgebase-app')
     [ "${DEPLOY_TEST_FAILURE:-}" != ready ] ;;
@@ -66,19 +69,21 @@ esac
             "DEPLOY_TEST_BACKUP_IMAGE": self.backup_image.as_posix(),
             "DEPLOY_TEST_FAILURE": failure,
             "DEPLOY_TEST_STOPPED": "yes" if stopped else "no",
+            "DEPLOY_TEST_PROJECT": self.server.as_posix(),
         })
         bash = os.environ.get("DEPLOY_TEST_BASH", "bash")
         return subprocess.run(
             [bash, "--noprofile", "--norc", str(self.stage / "deploy.sh"),
-             self.server.as_posix(), image or "knowledgebase:" + "a" * 40],
+             self.server.as_posix(), image or "knowledgebase:" + "a" * 40,
+             self.core.as_posix()],
             env=env, capture_output=True, text=True, timeout=30,
         )
 
     def existing_installation(self):
         (self.server / "data/knowledgebase.db").write_bytes(b"existing database")
         (self.server / "backups/keep").write_bytes(b"existing backup")
-        (self.server / "compose.yaml").write_text("old compose\n")
-        (self.server / "compose.override.yaml").write_text("old image\n")
+        (self.server / "docker-compose.yml").write_text("old compose\n")
+        (self.server / "docker-compose.override.yml").write_text("old image\n")
 
     def assert_preserved(self):
         self.assertEqual((self.server / ".env").read_bytes(), self.env_bytes)
@@ -91,8 +96,8 @@ esac
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assert_preserved()
         self.assertIn("knowledgebase:" + "a" * 40,
-                      (self.server / "compose.override.yaml").read_text())
-        self.assertNotIn(" up ", self.log.read_text())
+                      (self.server / "docker-compose.override.yml").read_text())
+        self.assertNotIn("up -d --no-deps --wait --wait-timeout 120 knowledgebase-app", self.log.read_text())
         self.assertIn("administrator", result.stdout)
         self.assertTrue((self.server / ".bootstrap-required").is_file())
 
@@ -101,7 +106,7 @@ esac
         (self.server / ".bootstrap-required").touch()
         result = self.run_deploy()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertNotIn("up -d", self.log.read_text())
+        self.assertNotIn("up -d --no-deps --wait --wait-timeout 120 knowledgebase-app", self.log.read_text())
         self.assertIn("administrator", result.stdout)
         self.assertTrue((self.server / ".bootstrap-required").is_file())
         self.assert_preserved()
@@ -119,6 +124,10 @@ esac
         self.assertNotIn("pull ", log)
         self.assertIn("exec -T knowledgebase-app /app/kb backup", log)
         self.assertIn("exec -T knowledgebase-app /app/kb check", log)
+        update = next(line for line in log.splitlines()
+                      if "up -d --no-deps --wait --wait-timeout 120 knowledgebase-app" in line)
+        self.assertTrue(update.startswith(self.core.as_posix() + " | "), update)
+        self.assertIn("exec -T nginx sh /opt/certificates/nginx-certificates.sh reload", log)
 
     def test_stopped_service_is_backed_up_using_current_image(self):
         self.existing_installation()
@@ -132,8 +141,8 @@ esac
         self.existing_installation()
         result = self.run_deploy(failure="backup")
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual((self.server / "compose.yaml").read_text(), "old compose\n")
-        self.assertEqual((self.server / "compose.override.yaml").read_text(), "old image\n")
+        self.assertEqual((self.server / "docker-compose.yml").read_text(), "old compose\n")
+        self.assertEqual((self.server / "docker-compose.override.yml").read_text(), "old image\n")
         self.assertNotIn("up -d", self.log.read_text())
         self.assert_preserved()
         self.assertFalse((self.server / ".deploy-lock").exists())
@@ -142,7 +151,7 @@ esac
         self.existing_installation()
         result = self.run_deploy(failure="load")
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual((self.server / "compose.override.yaml").read_text(), "old image\n")
+        self.assertEqual((self.server / "docker-compose.override.yml").read_text(), "old image\n")
         self.assertNotIn("backup", self.log.read_text())
         self.assert_preserved()
 
@@ -150,7 +159,7 @@ esac
         self.existing_installation()
         result = self.run_deploy(failure="inspect")
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual((self.server / "compose.override.yaml").read_text(), "old image\n")
+        self.assertEqual((self.server / "docker-compose.override.yml").read_text(), "old image\n")
         self.assertNotIn("backup", self.log.read_text())
         self.assert_preserved()
 
@@ -161,7 +170,7 @@ esac
         result = self.run_deploy()
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse(self.log.exists())
-        self.assertEqual((self.server / "compose.override.yaml").read_text(), "old image\n")
+        self.assertEqual((self.server / "docker-compose.override.yml").read_text(), "old image\n")
         self.assert_preserved()
 
     def test_missing_archive_is_rejected_before_docker(self):
@@ -175,8 +184,8 @@ esac
         self.existing_installation()
         result = self.run_deploy(failure="ready")
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("knowledgebase:", (self.server / "compose.override.yaml").read_text())
-        self.assertEqual(self.log.read_text().count("up -d"), 1)
+        self.assertIn("knowledgebase:", (self.server / "docker-compose.override.yml").read_text())
+        self.assertEqual(self.log.read_text().count("up -d --no-deps --wait --wait-timeout 120 knowledgebase-app"), 1)
         self.assert_preserved()
 
     def test_missing_env_fails_before_docker_and_does_not_create_env(self):
@@ -199,6 +208,13 @@ esac
         self.assertFalse(self.log.exists())
         self.assertTrue((self.server / ".deploy-lock").is_dir())
         self.assert_preserved()
+
+    def test_missing_core_stops_before_loading_or_replacing_anything(self):
+        (self.core / "docker-compose.yml").unlink()
+        result = self.run_deploy()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(self.log.exists())
+        self.assertFalse((self.server / "docker-compose.yml").exists())
 
 
 if __name__ == "__main__":

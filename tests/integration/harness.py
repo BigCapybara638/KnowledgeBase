@@ -17,7 +17,7 @@ import urllib.request
 import uuid
 
 ROOT = Path(__file__).resolve().parents[2]
-DOCKER = ['docker', '--host=unix:///var/run/docker.sock']
+DOCKER = ['docker', '--host=' + ('npipe:////./pipe/docker_engine' if os.name == 'nt' else 'unix:///var/run/docker.sock')]
 NGINX = 'nginx:1.28-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236'
 
 @dataclass
@@ -83,7 +83,7 @@ class Harness:
         self.env = {k: v for k, v in os.environ.items() if k not in ('DOCKER_HOST', 'DOCKER_CONTEXT', 'DOCKER_TLS', 'DOCKER_TLS_VERIFY', 'DOCKER_CERT_PATH')}
         self.env['KB_PUBLIC_URL'] = 'https://localhost'
         self.env.update(KB_IMAGE=os.environ.get('KB_IMAGE', 'knowledgebase:test'), KB_NETWORK_NAME=self.network, KB_ROUTE_FILE=str(ROOT/'deploy/nginx-site.conf.example'), KB_UPSTREAM_FILE=str(ROOT/'deploy/nginx-upstream.conf.example'), KB_TLS_DIR=str(self.cert_dir))
-        self.kb_files = ['-f', str(ROOT/'deploy/compose.yaml'), '-f', str(ROOT/'tests/integration/compose.kb.yaml')]
+        self.kb_files = ['--profile', 'knowledgebase', '-f', str(ROOT/'deploy/compose.yaml'), '-f', str(ROOT/'tests/integration/compose.kb.yaml')]
         self.proxy_files = ['-f', str(ROOT/'tests/integration/compose.proxy.yaml')]
         self.password = secrets.token_urlsafe(24)
         self.origin = ''
